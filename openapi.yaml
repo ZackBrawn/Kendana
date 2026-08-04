@@ -1,0 +1,568 @@
+openapi: 3.0.3
+info:
+  title: kendana API Specification
+  description: REST API Specifications for the kendana mobile-first personal finance tracker.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: Zack Brawn
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securepassword123
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User registered successfully
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      name:
+                        type: string
+                        example: Zack Brawn
+                      email:
+                        type: string
+                        example: user@example.com
+
+  /auth/login:
+    post:
+      summary: Login user
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securepassword123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Login successful
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user profile
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 1
+                  name:
+                    type: string
+                    example: Zack Brawn
+                  email:
+                    type: string
+                    example: user@example.com
+                  allow_negative_balance:
+                    type: boolean
+                    example: false
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2026-07-21T18:27:29.000Z"
+
+  /dashboard:
+    get:
+      summary: Get monthly financial summary and recent transactions
+      tags:
+        - Dashboard
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard summary loaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_net_worth:
+                    type: number
+                    example: 12920200
+                  monthly_income:
+                    type: number
+                    example: 15000000
+                  monthly_expense:
+                    type: number
+                    example: 2079800
+                  recent_transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+
+  /wallets:
+    get:
+      summary: Get all wallets
+      tags:
+        - Wallets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of wallets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Wallet'
+    post:
+      summary: Create a new wallet
+      tags:
+        - Wallets
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - balance
+              properties:
+                name:
+                  type: string
+                  example: Bank Mandiri
+                balance:
+                  type: number
+                  example: 2500000
+                group_type:
+                  type: string
+                  example: Liquid
+                icon:
+                  type: string
+                  example: 💳
+      responses:
+        '201':
+          description: Wallet created successfully
+
+  /wallets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      summary: Update a wallet
+      tags:
+        - Wallets
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                balance:
+                  type: number
+                group_type:
+                  type: string
+                icon:
+                  type: string
+                is_pinned:
+                  type: boolean
+      responses:
+        '200':
+          description: Wallet updated successfully
+    delete:
+      summary: Delete a wallet
+      tags:
+        - Wallets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Wallet deleted successfully
+
+  /categories:
+    get:
+      summary: Get all categories
+      tags:
+        - Categories
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of categories
+    post:
+      summary: Create a new category
+      tags:
+        - Categories
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - type_id
+              properties:
+                name:
+                  type: string
+                  example: Makanan & Minuman
+                type_id:
+                  type: integer
+                  description: "1: Income, 2: Expense"
+                  example: 2
+                icon:
+                  type: string
+                  example: 🍔
+                color:
+                  type: string
+                  example: "#f97316"
+      responses:
+        '201':
+          description: Category created successfully
+
+  /categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      summary: Update a category
+      tags:
+        - Categories
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Category updated successfully
+    delete:
+      summary: Delete a category
+      tags:
+        - Categories
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Category deleted successfully
+
+  /transactions:
+    get:
+      summary: Get transaction logs
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+    post:
+      summary: Create a new transaction (Income, Expense, or Transfer)
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - type_id
+                - source_wallet_id
+                - date
+              properties:
+                amount:
+                  type: number
+                  example: 45000
+                subject:
+                  type: string
+                  example: Makan Siang
+                type_id:
+                  type: integer
+                  description: "1: Income, 2: Expense, 3: Transfer"
+                  example: 2
+                category_id:
+                  type: integer
+                  example: 4
+                source_wallet_id:
+                  type: integer
+                  example: 1
+                dest_wallet_id:
+                  type: integer
+                  nullable: true
+                  example: null
+                notes:
+                  type: string
+                  example: Nasi padang
+                date:
+                  type: string
+                  example: "2026-08-04 13:15"
+      responses:
+        '201':
+          description: Transaction created successfully
+
+  /transactions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      summary: Update/Edit an existing transaction
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Transaction updated successfully
+    delete:
+      summary: Delete a transaction
+      tags:
+        - Transactions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Transaction deleted successfully
+
+  /analytics:
+    get:
+      summary: Get financial reports and visual insights
+      tags:
+        - Analytics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Analytics details loaded
+
+  /loans/{type}:
+    get:
+      summary: Get loans or debts logs
+      tags:
+        - Loans
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [loan, debt]
+      responses:
+        '200':
+          description: List of loans/debts
+
+  /budgets:
+    get:
+      summary: Get all monthly budgets
+      tags:
+        - Budgets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of budgets
+    post:
+      summary: Create a new budget limit for a category
+      tags:
+        - Budgets
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - category_id
+                - limit_amount
+              properties:
+                category_id:
+                  type: integer
+                  example: 3
+                limit_amount:
+                  type: number
+                  example: 1500000
+                period:
+                  type: string
+                  default: Monthly
+                  example: Monthly
+      responses:
+        '201':
+          description: Budget limit created successfully
+
+  /budgets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Get budget details and spending progress
+      tags:
+        - Budgets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Budget detail loaded
+    put:
+      summary: Update budget limit
+      tags:
+        - Budgets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Budget updated successfully
+    delete:
+      summary: Delete budget limit
+      tags:
+        - Budgets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Budget deleted successfully
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        subject:
+          type: string
+        type_name:
+          type: string
+          enum: [Income, Expense, Transfer]
+        category_name:
+          type: string
+        source_wallet_name:
+          type: string
+        dest_wallet_name:
+          type: string
+        notes:
+          type: string
+        date:
+          type: string
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        balance:
+          type: string
+        group_type:
+          type: string
+        icon:
+          type: string
+        is_pinned:
+          type: boolean

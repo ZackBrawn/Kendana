@@ -1,0 +1,150 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                     Int      @id @default(autoincrement())
+  name                   String
+  email                  String   @unique
+  password               String
+  allow_negative_balance Boolean  @default(false)
+  created_at             DateTime @default(now())
+
+  wallets             Wallet[]
+  categories          Category[]
+  transaction_logs    TransactionLog[]
+  net_worth_snapshots NetWorthSnapshot[]
+  budgets             Budget[]
+
+  @@map("users")
+}
+
+model TransactionType {
+  id               Int              @id @default(autoincrement())
+  name             String           @unique
+  categories       Category[]
+  transaction_logs TransactionLog[]
+
+  @@map("transaction_types")
+}
+
+model Wallet {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  name       String
+  balance    Decimal  @default(0)
+  group_type String   @default("Liquid")
+  icon       String   @default("💵")
+  keyword    String?
+  is_pinned  Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user        User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  source_logs TransactionLog[] @relation("SourceWallet")
+  dest_logs   TransactionLog[] @relation("DestWallet")
+  budgets     Budget[]
+
+  @@map("wallets")
+}
+
+model Category {
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  type_id       Int
+  category_name String
+  icon          String   @default("📁")
+  keyword       String?
+  created_at    DateTime @default(now())
+
+  user             User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type             TransactionType  @relation(fields: [type_id], references: [id], onDelete: Cascade)
+  transaction_logs TransactionLog[]
+  budget_categories BudgetCategory[]
+
+  @@map("categories")
+}
+
+model TransactionLog {
+  id                    Int      @id @default(autoincrement())
+  reference_number      String   @unique
+  user_id               Int
+  date                  DateTime
+  type_id               Int
+  category_id           Int?
+  source_wallet_id      Int
+  destination_wallet_id Int
+  amount                Decimal
+  balance_before        Decimal  @default(0)
+  balance_after         Decimal  @default(0)
+  subject               String?
+  notes                 String?
+  is_cleared            Boolean  @default(true)
+  created_at            DateTime @default(now())
+
+  user               User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type               TransactionType @relation(fields: [type_id], references: [id])
+  category           Category?       @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  source_wallet      Wallet          @relation("SourceWallet", fields: [source_wallet_id], references: [id])
+  destination_wallet Wallet          @relation("DestWallet", fields: [destination_wallet_id], references: [id])
+
+  @@map("transaction_logs")
+}
+
+model NetWorthSnapshot {
+  id                   Int      @id @default(autoincrement())
+  user_id              Int
+  snapshot_date        DateTime
+  total_wallet_balance Decimal  @default(0)
+  total_receivables    Decimal  @default(0)
+  total_debts          Decimal  @default(0)
+  net_worth            Decimal  @default(0)
+  created_at           DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, snapshot_date])
+  @@map("net_worth_snapshots")
+}
+
+model Budget {
+  id                       Int              @id @default(autoincrement())
+  user_id                  Int
+  name                     String
+  icon                     String           @default("PhFolder")
+  limit_amount             Decimal
+  wallet_scope             String           // 'single' | 'all'
+  wallet_id                Int?
+  category_scope           String           // 'specific' | 'all'
+  period_type              String           // 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'
+  period_multiplier        Int              @default(1)
+  start_date               DateTime
+  is_permanent             Boolean          @default(true)
+  end_date                 DateTime?
+  show_on_dashboard        Boolean          @default(true)
+  notify_on_threshold      Boolean          @default(false)
+  notify_threshold_percent Int?
+  notes                    String?          // Catatan/Keterangan tambahan (opsional)
+  created_at               DateTime         @default(now())
+  updated_at               DateTime         @updatedAt
+
+  user                     User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  wallet                   Wallet?          @relation(fields: [wallet_id], references: [id], onDelete: SetNull)
+  categories               BudgetCategory[]
+
+  @@map("budgets")
+}
+
+model BudgetCategory {
+  budget_id   Int
+  category_id Int
+
+  budget   Budget   @relation(fields: [budget_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([budget_id, category_id])
+  @@map("budget_categories")
+}

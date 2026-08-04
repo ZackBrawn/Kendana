@@ -1,0 +1,27 @@
+{
+  "name": "kendana-ex",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kendana - Express.js + Vue 3 + Tailwind + PostgreSQL + PWA",
+  "scripts": {
+    "dev:backend": "node backend/app.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run express\" \"npm run dev:frontend\"",
+    "build": "cd frontend && npm run build",
+    "start": "node backend/app.js",
+    "express": "nodemon backend/app.js"
+  },
+  "dependencies": {
+    "@phosphor-icons/vue": "^2.2.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "nodemon": "^3.1.14"
+  }
+}

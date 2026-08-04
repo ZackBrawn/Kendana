@@ -1,0 +1,153 @@
+/* 
+ * CENTRALIZED GLOBAL THEME SYSTEM (SSOT)
+ * Change variables here to customize colors, fonts, sizes, and layout.
+ */
+
+:root {
+  /* --- TYPOGRAPHY --- */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-2xs: 0.65rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+
+  /* --- LIGHT THEME COLOR PALETTE --- */
+  --color-bg-body: #f1f5f9;
+  /* Soft slate background outside mobile frame */
+  --color-bg-app: #f8fafc;
+  /* Light mobile container background */
+  --color-bg-card: #ffffff;
+  /* Pure white card surfaces */
+  --color-bg-card-subtle: #f1f5f9;
+  /* Light slate secondary background */
+  --color-border: #e2e8f0;
+  /* Crisp light border */
+  --color-border-subtle: #f1f5f9;
+
+  /* --- TEXT COLORS --- */
+  --color-text-main: #0f172a;
+  /* Deep charcoal / dark navy */
+  --color-text-muted: #64748b;
+  /* Slate grey */
+  --color-text-light: #94a3b8;
+  /* Light muted grey */
+
+  /* --- ACCENT & BRAND COLORS --- */
+  --color-primary: #4f46e5;
+  /* Indigo primary */
+  --color-primary-hover: #4338ca;
+  --color-primary-light: #e0e7ff;
+  /* Light indigo badge background */
+
+  --color-income: #16a34a;
+  /* Green income */
+  --color-income-light: #dcfce7;
+
+  --color-expense: #dc2626;
+  /* Red expense */
+  --color-expense-light: #fee2e2;
+
+  --color-transfer: #2563eb;
+  /* Blue transfer */
+  --color-transfer-light: #dbeafe;
+
+  --color-shadow: rgba(15, 23, 42, 0.06);
+}
+
+/* Base Body Setup */
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-body);
+  color: var(--color-text-main);
+}
+
+/* Global utility classes linked to SSOT variables */
+.bg-app {
+  background-color: var(--color-bg-app);
+}
+
+.bg-card {
+  background-color: var(--color-bg-card);
+}
+
+.bg-card-subtle {
+  background-color: var(--color-bg-card-subtle);
+}
+
+.border-theme {
+  border-color: var(--color-border);
+}
+
+.text-main {
+  color: var(--color-text-main);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-primary-brand {
+  color: var(--color-primary);
+}
+
+.card-shadow {
+  box-shadow: 0 4px 20px -2px var(--color-shadow), 0 2px 6px -1px var(--color-shadow);
+}
+
+/* Global Transaction Status Colors */
+.text-income {
+  color: var(--color-income) !important;
+}
+
+.text-expense {
+  color: var(--color-expense) !important;
+}
+
+.text-transfer {
+  color: #000000 !important;
+}
+
+/* Centralized Accent Color System Utilities */
+.bg-accent {
+  background-color: var(--color-primary) !important;
+}
+
+.bg-accent-hover:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+.bg-accent-light {
+  background-color: var(--color-primary-light) !important;
+}
+
+.text-accent {
+  color: var(--color-primary) !important;
+}
+
+.text-accent-hover:hover {
+  color: var(--color-primary-hover) !important;
+}
+
+.border-accent {
+  border-color: var(--color-primary) !important;
+}
+
+.ring-accent {
+  --tw-ring-color: var(--color-primary) !important;
+}
+
+.bg-accent-gradient {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%) !important;
+}
+
+/* Bottom Navigation Active Label Toggle */
+.nav-link span {
+  display: none;
+}
+
+.nav-link.router-link-active span {
+  display: inline-block;
+}
