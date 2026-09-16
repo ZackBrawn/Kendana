@@ -156,3 +156,4 @@ export const WALLET_ICONS = [
   { name: 'Phseabank', label: '' },
   { name: 'Phjenius', label: '' }
 ];
+

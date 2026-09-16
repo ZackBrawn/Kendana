@@ -30,3 +30,4 @@ export const Phbri = createCdnLogoComponent('bri');
 export const Phjago = createCdnLogoComponent('jago');
 export const Phseabank = createCdnLogoComponent('seabank');
 export const Phjenius = createCdnLogoComponent('jenius');
+

@@ -118,6 +118,25 @@ const handleDelete = () => {
   isSwiped.value = false;
   emit('delete', props.transaction);
 };
+
+const isPositiveTransaction = (transaction) => {
+  const systemKey = transaction.category_system_key || transaction.category?.system_key;
+  if (transaction.type_name === 'Income') return true;
+  if (transaction.type_name === 'Expense') return false;
+  if (systemKey === 'LOAN' || systemKey === 'RECEIVABLE_PAYMENT') return true;
+  if (systemKey === 'DEBT_PAYMENT' || systemKey === 'RECEIVABLE') return false;
+  return null;
+};
+
+const amountSign = (transaction) => {
+  const isPositive = isPositiveTransaction(transaction);
+  return isPositive === true ? '+' : (isPositive === false ? '-' : '');
+};
+
+const amountColorClass = (transaction) => {
+  const isPositive = isPositiveTransaction(transaction);
+  return isPositive === true ? 'text-income' : (isPositive === false ? 'text-expense' : 'text-transfer');
+};
 </script>
 
 <template>
@@ -126,7 +145,7 @@ const handleDelete = () => {
     <div class="absolute inset-0 flex justify-end items-stretch z-0 bg-slate-100">
       <!-- Edit Action -->
       <button type="button" @click.stop="handleEdit"
-        class="w-16 bg-accent bg-accent-hover text-white flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
+        class="w-16 bg-accent text-white flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
         <PhPencil :size="24" />
       </button>
       <!-- Delete Action -->
@@ -161,14 +180,18 @@ const handleDelete = () => {
       <div class="text-right shrink-0">
         <p :class="[
           'text-xs font-black',
-          transaction.type_name === 'Income' ? 'text-income' : (transaction.type_name === 'Expense' ? 'text-expense' : 'text-transfer')
+          amountColorClass(transaction)
         ]">
-          {{ transaction.type_name === 'Income' ? '+' : (transaction.type_name === 'Expense' ? '-' : '') }}{{ hideValues ? '***' : formatRp(transaction.amount) }}
+          {{ amountSign(transaction) }}{{ hideValues ? '***' : formatRp(transaction.amount) }}
         </p>
         <p class="text-[9px] text-slate-400 font-medium">
           {{ transaction.type_name === 'Income' || transaction.type_name === 'Debt' ? transaction.dest_wallet_name : transaction.source_wallet_name }}
           <span class="mx-1">•</span>
-          {{ transaction.date ? transaction.date.split('T')[1]?.slice(0, 5) || '' : '' }}
+          {{ (() => {
+            if (!transaction.date) return '';
+            const d = new Date(transaction.date);
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          })() }}
         </p>
       </div>
     </div>

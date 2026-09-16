@@ -6,3 +6,4 @@ const { authenticateToken } = require('../middlewares/auth');
 router.get('/', authenticateToken, analytics.getAnalytics);
 
 module.exports = router;
+

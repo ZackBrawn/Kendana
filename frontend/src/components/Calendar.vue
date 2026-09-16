@@ -14,6 +14,10 @@ const props = defineProps({
   showTime: {
     type: Boolean,
     default: false
+  },
+  timeOnly: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -22,7 +26,7 @@ const emit = defineEmits(['update:modelValue', 'close']);
 const calendarYear = ref(new Date().getFullYear());
 const calendarMonth = ref(new Date().getMonth());
 const calendarHour = ref(new Date().getHours());
-const calendarMinute = ref(Math.round(new Date().getMinutes() / 10) * 10 % 60);
+const calendarMinute = ref(Math.round(new Date().getMinutes() / 5) * 5 % 60);
 
 const showMonthYearPicker = ref(false);
 
@@ -36,6 +40,12 @@ watch(
   () => props.modelValue,
   (newVal) => {
     if (newVal) {
+      if (props.timeOnly) {
+        const [hour, minute] = newVal.split(':');
+        if (hour !== undefined) calendarHour.value = parseInt(hour);
+        if (minute !== undefined) calendarMinute.value = Math.round(parseInt(minute) / 5) * 5 % 60;
+        return;
+      }
       const [datePart, timePart] = newVal.split(' ');
       const parts = datePart.split('-');
       if (parts.length === 3) {
@@ -46,7 +56,7 @@ watch(
         const timeParts = timePart.split(':');
         if (timeParts.length >= 2) {
           calendarHour.value = parseInt(timeParts[0]);
-          calendarMinute.value = Math.round(parseInt(timeParts[1]) / 10) * 10 % 60;
+          calendarMinute.value = Math.round(parseInt(timeParts[1]) / 5) * 5 % 60;
         }
       }
     }
@@ -86,7 +96,7 @@ const yearList = computed(() => {
 });
 
 const hourList = Array.from({ length: 24 }, (_, i) => i);
-const minuteList = [0, 10, 20, 30, 40, 50];
+const minuteList = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 const scrollToItem = (index, type) => {
   let container;
@@ -128,6 +138,12 @@ const handleScroll = (event, type) => {
     if (targetMinute !== undefined && calendarMinute.value !== targetMinute) {
       calendarMinute.value = targetMinute;
     }
+  }
+
+  if (props.timeOnly) {
+    const hStr = String(calendarHour.value).padStart(2, '0');
+    const mStr = String(calendarMinute.value).padStart(2, '0');
+    emit('update:modelValue', `${hStr}:${mStr}`);
   }
   
   setTimeout(() => {
@@ -234,6 +250,14 @@ const selectCalendarDate = (day) => {
   const formattedMonth = String(calendarMonth.value + 1).padStart(2, '0');
   const formattedDay = String(day).padStart(2, '0');
   let targetStr = `${calendarYear.value}-${formattedMonth}-${formattedDay}`;
+
+  if (props.timeOnly) {
+    const hStr = String(calendarHour.value).padStart(2, '0');
+    const mStr = String(calendarMinute.value).padStart(2, '0');
+    emit('update:modelValue', `${hStr}:${mStr}`);
+    emit('close');
+    return;
+  }
   
   if (props.showTime) {
     const hStr = String(calendarHour.value).padStart(2, '0');
@@ -284,14 +308,42 @@ const nextCalendarMonth = () => {
         <div class="flex items-center gap-1.5 text-accent">
           <PhCalendarBlank :size="24" weight="bold" />
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">
-            {{ showMonthYearPicker ? 'Pilih Waktu & Periode' : 'Pilih Tanggal' }}
+            {{ props.timeOnly ? 'Pilih Waktu' : (showMonthYearPicker ? 'Pilih Waktu & Periode' : 'Pilih Tanggal') }}
           </h3>
         </div>
         <button @click="emit('close')"
           class="p-1 rounded-full text-slate-400 hover:bg-slate-100 text-xs font-bold cursor-pointer">✕</button>
       </div>
 
-      <div v-if="showMonthYearPicker" class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-4 animate-in fade-in duration-200">
+      <div v-if="props.timeOnly" class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-4">
+        <div class="relative h-[120px] flex gap-2 overflow-hidden select-none">
+          <div class="absolute inset-x-0 top-10 h-10 bg-slate-200/50 rounded-xl pointer-events-none z-10"></div>
+          <div ref="hourRef" @scroll="handleScroll($event, 'hour')"
+            class="flex-1 overflow-y-auto snap-y snap-mandatory no-scrollbar text-center relative z-20"
+            style="padding-top: 40px; padding-bottom: 40px; height: 120px;">
+            <div v-for="(h, index) in hourList" :key="h" @click="scrollToItem(index, 'hour')"
+              class="h-10 flex items-center justify-center snap-center text-sm font-extrabold cursor-pointer transition-colors duration-150"
+              :class="calendarHour === h ? 'text-slate-900 font-black scale-105' : 'text-slate-400 font-semibold'">
+              {{ String(h).padStart(2, '0') }}
+            </div>
+          </div>
+          <div ref="minuteRef" @scroll="handleScroll($event, 'minute')"
+            class="flex-1 overflow-y-auto snap-y snap-mandatory no-scrollbar text-center relative z-20"
+            style="padding-top: 40px; padding-bottom: 40px; height: 120px;">
+            <div v-for="(min, index) in minuteList" :key="min" @click="scrollToItem(index, 'minute')"
+              class="h-10 flex items-center justify-center snap-center text-sm font-extrabold cursor-pointer transition-colors duration-150"
+              :class="calendarMinute === min ? 'text-slate-900 font-black scale-105' : 'text-slate-400 font-semibold'">
+              {{ String(min).padStart(2, '0') }}
+            </div>
+          </div>
+        </div>
+        <button type="button" @click="emit('close')"
+          class="w-full py-2.5 bg-accent hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-500/25 transition-all cursor-pointer">
+          Selesai Pilih
+        </button>
+      </div>
+
+      <div v-else-if="showMonthYearPicker" class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-4 animate-in fade-in duration-200">
         
         <div class="relative h-[120px] flex gap-2 overflow-hidden select-none">
           <div class="absolute inset-x-0 top-10 h-10 bg-slate-200/50 rounded-xl pointer-events-none z-10"></div>

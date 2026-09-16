@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { api, showToast } from '../api';
 import Keypad from './Keypad.vue';
 import Calendar from './Calendar.vue';
-import { PhArrowLeft, PhCalendarDots, PhKeyboard, PhTrash, PhFloppyDisk, PhSwap, PhWarning, PhPencil } from "@phosphor-icons/vue";
+import ConfirmDeleteModal from './ConfirmDeleteModal.vue';
+import { PhArrowLeft, PhCalendarDots, PhKeyboard, PhTrash, PhFloppyDisk, PhSwap, PhWarning, PhPencil, PhCamera, PhMagicWand } from "@phosphor-icons/vue";
 
 const props = defineProps({
   editTransaction: {
@@ -22,6 +23,7 @@ const sourceWalletId = ref(null);
 const destWalletId = ref(null);
 const notes = ref('');
 const isNotesFocused = ref(false);
+const partyName = ref('');
 
 const getLocalDateStr = (dateObj) => {
   const y = dateObj.getFullYear();
@@ -30,8 +32,8 @@ const getLocalDateStr = (dateObj) => {
   return `${y}-${m}-${d}`;
 };
 
-const todayStr = getLocalDateStr(new Date());
-const yesterdayStr = getLocalDateStr(new Date(Date.now() - 86400000));
+const todayStr = computed(() => getLocalDateStr(new Date()));
+const yesterdayStr = computed(() => getLocalDateStr(new Date(Date.now() - 86400000)));
 
 const getNowStr = () => {
   const now = new Date();
@@ -54,6 +56,7 @@ const showKeypad = ref(true);
 
 const categories = ref([]);
 const wallets = ref([]);
+const subjects = ref([]);
 const loading = ref(false);
 const errorMsg = ref('');
 
@@ -225,19 +228,35 @@ const liquidWallets = computed(() => {
 const selectedSourceWallet = computed(() => wallets.value.find(w => w.id === sourceWalletId.value));
 const selectedDestWallet = computed(() => wallets.value.find(w => w.id === destWalletId.value));
 
+const selectedDebtWallet = computed(() => {
+  const src = wallets.value.find(w => w.id === sourceWalletId.value);
+  const dst = wallets.value.find(w => w.id === destWalletId.value);
+  if (src && src.group_type !== 'System') return src;
+  if (dst && dst.group_type !== 'System') return dst;
+  return null;
+});
+
+const debtWalletMode = computed(() => {
+  const src = wallets.value.find(w => w.id === sourceWalletId.value);
+  if (src && src.group_type !== 'System') return 'source';
+  return 'dest';
+});
+
 
 
 const formattedDateLabel = computed(() => {
   const [datePart, timePart] = date.value.split(' ');
-  const displayTime = (props.editTransaction && timePart) ? ` ${timePart}` : '';
 
-  if (datePart === todayStr) return `Hari Ini${displayTime}`;
-  if (datePart === yesterdayStr) return `Kemarin${displayTime}`;
+  if (datePart === todayStr.value) {
+    const displayTime = (props.editTransaction && timePart) ? ` ${timePart}` : '';
+    return `Hari Ini${displayTime}`;
+  }
 
   const parts = datePart.split('-');
   if (parts.length === 3) {
     const d = parseInt(parts[2]);
     const m = monthNames[parseInt(parts[1]) - 1].slice(0, 3);
+    const displayTime = timePart ? ` ${timePart}` : '';
     return `${d} ${m}${displayTime}`;
   }
   return date.value;
@@ -259,6 +278,7 @@ const populateForEdit = () => {
   sourceWalletId.value = t.source_wallet_id;
   destWalletId.value = t.destination_wallet_id;
   notes.value = t.notes || '';
+  partyName.value = (t.subject && t.subject !== '-') ? t.subject : '';
   if (t.date) {
     const d = new Date(t.date);
     const y = d.getFullYear();
@@ -285,37 +305,105 @@ const loadOptions = async () => {
   }
 };
 
-const handleTypeChange = (tId, tabName) => {
+const isDebtOrReceivable = computed(() => typeId.value === 4 || typeId.value === 5);
+
+const getLastWallets = (tId) => {
+  try {
+    return JSON.parse(localStorage.getItem(`last_wallets_${tId}`) || '{}');
+  } catch (e) {
+    return {};
+  }
+};
+
+const isAvailableWallet = (walletId) => {
+  return wallets.value.some(wallet => wallet.id === walletId && wallet.group_type !== 'System');
+};
+
+const handleTypeChange = async (tId, tabName) => {
   typeId.value = tId;
   mainTab.value = tabName;
   categoryId.value = null;
+  partyName.value = '';
   categoryTab.value = 'list';
+
+  if (tId === 4 || tId === 5) {
+    try {
+      subjects.value = await api.getLoanSubjects(tId === 4 ? 'debt' : 'receivable');
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   const liquid = wallets.value.filter(w => w.group_type !== 'System');
   const merchantSys = wallets.value.find(w => w.name.toLowerCase().includes('merchant') || w.name.toLowerCase().includes('external')) || wallets.value[0];
   const debtSys = wallets.value.find(w => w.name.toLowerCase().includes('hutang')) || merchantSys;
   const recSys = wallets.value.find(w => w.name.toLowerCase().includes('piutang')) || merchantSys;
+  const lastWallets = getLastWallets(tId);
+  const lastLiquidId = isAvailableWallet(lastWallets.liquid) ? lastWallets.liquid : null;
+  const lastSourceId = isAvailableWallet(lastWallets.source) ? lastWallets.source : null;
+  const lastDestinationId = isAvailableWallet(lastWallets.destination) ? lastWallets.destination : null;
 
   if (tId === 2) {
-    if (liquid.length > 0) sourceWalletId.value = liquid[0].id;
+    if (lastLiquidId) sourceWalletId.value = lastLiquidId;
+    else if (liquid.length > 0) sourceWalletId.value = liquid[0].id;
     if (merchantSys) destWalletId.value = merchantSys.id;
   } else if (tId === 1) {
     if (merchantSys) sourceWalletId.value = merchantSys.id;
-    if (liquid.length > 0) destWalletId.value = liquid[0].id;
+    if (lastLiquidId) destWalletId.value = lastLiquidId;
+    else if (liquid.length > 0) destWalletId.value = liquid[0].id;
   } else if (tId === 3) {
-    if (liquid.length > 0) sourceWalletId.value = liquid[0].id;
-    if (liquid.length > 1) destWalletId.value = liquid[1].id;
+    if (lastSourceId) sourceWalletId.value = lastSourceId;
+    else if (liquid.length > 0) sourceWalletId.value = liquid[0].id;
+    if (lastDestinationId && lastDestinationId !== sourceWalletId.value) destWalletId.value = lastDestinationId;
+    else if (liquid.length > 1) destWalletId.value = liquid.find(wallet => wallet.id !== sourceWalletId.value)?.id;
   } else if (tId === 4) {
     if (debtSys) sourceWalletId.value = debtSys.id;
-    if (liquid.length > 0) destWalletId.value = liquid[0].id;
+    if (lastLiquidId) destWalletId.value = lastLiquidId;
+    else if (liquid.length > 0) destWalletId.value = liquid[0].id;
   } else if (tId === 5) {
-    if (liquid.length > 0) sourceWalletId.value = liquid[0].id;
+    if (lastLiquidId) sourceWalletId.value = lastLiquidId;
+    else if (liquid.length > 0) sourceWalletId.value = liquid[0].id;
     if (recSys) destWalletId.value = recSys.id;
   }
 
   const matchingCats = categories.value.filter(c => c.type_id === tId);
   if (matchingCats.length > 0) categoryId.value = matchingCats[0].id;
 };
+
+const applyDebtWalletDirection = (cat) => {
+  if (!cat) return;
+  const liquid = wallets.value.filter(w => w.group_type !== 'System');
+  const debtSys = wallets.value.find(w => w.name.toLowerCase().includes('hutang'));
+  const recSys = wallets.value.find(w => w.name.toLowerCase().includes('piutang'));
+  const lastWallets = getLastWallets(typeId.value);
+  const lastLiquid = liquid.find(wallet => wallet.id === lastWallets.liquid);
+  const preferredLiquid = lastLiquid || liquid[0];
+
+  if (cat.system_key === 'LOAN') {
+    // Terima Hutang: uang masuk ke dompet liquid
+    if (debtSys) sourceWalletId.value = debtSys.id;
+    if (preferredLiquid) destWalletId.value = preferredLiquid.id;
+  } else if (cat.system_key === 'DEBT_PAYMENT') {
+    // Bayar Hutang: uang keluar dari dompet liquid
+    if (preferredLiquid) sourceWalletId.value = preferredLiquid.id;
+    if (debtSys) destWalletId.value = debtSys.id;
+  } else if (cat.system_key === 'RECEIVABLE') {
+    // Ngasih Piutang: uang keluar dari dompet liquid
+    if (preferredLiquid) sourceWalletId.value = preferredLiquid.id;
+    if (recSys) destWalletId.value = recSys.id;
+  } else if (cat.system_key === 'RECEIVABLE_PAYMENT') {
+    // Terima Bayar Piutang: uang masuk ke dompet liquid
+    if (recSys) sourceWalletId.value = recSys.id;
+    if (preferredLiquid) destWalletId.value = preferredLiquid.id;
+  }
+};
+
+watch(categoryId, (newId) => {
+  if (typeId.value === 4 || typeId.value === 5) {
+    const cat = categories.value.find(c => c.id === newId);
+    applyDebtWalletDirection(cat);
+  }
+});
 
 const handleKeypad = (val) => {
   if (val === 'backspace') {
@@ -371,17 +459,32 @@ const handleSubmit = async () => {
       source_wallet_id: sourceWalletId.value,
       destination_wallet_id: destWalletId.value,
       amount: numAmount,
-      subject: notes.value ? notes.value.slice(0, 30) : '-',
+      subject: isDebtOrReceivable.value ? (partyName.value || '-') : (notes.value ? notes.value.slice(0, 30) : '-'),
       notes: notes.value
     };
+
+    if (isDebtOrReceivable.value && (!partyName.value || partyName.value === '-')) {
+      errorMsg.value = 'Nama pemberi/peminjam wajib diisi';
+      return;
+    }
 
     if (props.editTransaction) {
       await api.updateTransaction(props.editTransaction.id, payload);
       showToast('Transaksi berhasil diperbarui', 'success');
     } else {
-      await api.createTransaction(payload);
-      showToast('Transaksi berhasil disimpan', 'success');
+      const result = await api.createTransaction(payload);
+      showToast(result.offline ? 'Transaksi disimpan offline dan akan disinkronkan saat online' : 'Transaksi berhasil disimpan', 'success');
     }
+
+    const sourceWallet = wallets.value.find(wallet => wallet.id === payload.source_wallet_id);
+    const destinationWallet = wallets.value.find(wallet => wallet.id === payload.destination_wallet_id);
+    const liquidWallet = sourceWallet?.group_type !== 'System' ? sourceWallet : destinationWallet;
+    localStorage.setItem(`last_wallets_${payload.type_id}`, JSON.stringify({
+      source: payload.source_wallet_id,
+      destination: payload.destination_wallet_id,
+      liquid: liquidWallet?.id || null
+    }));
+
     emit('created');
   } catch (err) {
     showToast(err.message, 'error');
@@ -411,6 +514,77 @@ const confirmDelete = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const ocrLoading = ref(false);
+const ocrFileInput = ref(null);
+
+const triggerOcrUpload = () => {
+  ocrFileInput.value.click();
+};
+
+const handleOcrFileChange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  ocrLoading.value = true;
+  showToast('Sedang mengunggah struk bukti...', 'info');
+
+  try {
+    const res = await api.uploadEvidence(formData);
+    const uuid = res.evidence.uuid;
+    pollOcrStatus(uuid);
+  } catch (err) {
+    showToast(err.message || 'Gagal mengunggah struk', 'error');
+    ocrLoading.value = false;
+  }
+};
+
+const pollOcrStatus = async (uuid) => {
+  const interval = setInterval(async () => {
+    try {
+      const draft = await api.getEvidenceDraft(uuid);
+      if (draft.status === 'READY') {
+        clearInterval(interval);
+        ocrLoading.value = false;
+
+        const data = draft.resolved_data || {};
+        if (data.amount) {
+          amountStr.value = String(data.amount);
+        }
+        if (data.merchant) {
+          notes.value = data.merchant;
+        }
+        if (data.date) {
+          const formatted = data.date.slice(0, 16);
+          date.value = formatted;
+        }
+
+        if (data.category_name) {
+          const matchedCat = categories.value.find(c =>
+            c.category_name.toLowerCase().includes(data.category_name.toLowerCase()) ||
+            data.category_name.toLowerCase().includes(c.category_name.toLowerCase())
+          );
+          if (matchedCat) {
+            categoryId.value = matchedCat.id;
+          }
+        }
+
+        showToast('Struk berhasil dipindai secara otomatis!', 'success');
+      } else if (draft.status === 'FAILED') {
+        clearInterval(interval);
+        ocrLoading.value = false;
+        showToast(draft.error_message || 'Gagal menganalisis struk bukti', 'error');
+      }
+    } catch (err) {
+      clearInterval(interval);
+      ocrLoading.value = false;
+      showToast(err.message || 'Terjadi kesalahan saat pemrosesan struk', 'error');
+    }
+  }, 2500);
 };
 
 onMounted(loadOptions);
@@ -444,8 +618,7 @@ onMounted(loadOptions);
         </div>
 
         <button type="button" @click="$emit('close')"
-          class="shrink-0 w-10 h-10 text-accent flex items-center justify-center transition-colors"
-          aria-label="Tutup">
+          class="shrink-0 w-10 h-10 text-accent flex items-center justify-center transition-colors" aria-label="Tutup">
           <component :is="resolveIcon('PhX')" :size="24" weight="bold" />
         </button>
 
@@ -516,7 +689,7 @@ onMounted(loadOptions);
 
         <div v-else class="flex-1 flex flex-col min-h-0 space-y-2">
 
-          <div class="flex justify-center shrink-0">
+          <div v-if="typeId !== 4 && typeId !== 5" class="flex justify-center shrink-0">
             <div
               class="flex p-0.5 bg-slate-200 border border-slate-200/50 rounded-xl relative w-56 select-none shadow-2xs">
               <div
@@ -563,7 +736,7 @@ onMounted(loadOptions);
             <div v-else key="settings" class="flex-1 flex flex-col min-h-0 space-y-1.5">
               <div class="px-4 py-1 shrink-0">
                 <button type="button" @click="showAddCategorySheet = true"
-                  class="w-full py-2.5 bg-accent bg-accent-hover text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 flex items-center justify-center gap-1.5">
+                  class="w-full py-2.5 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 flex items-center justify-center gap-1.5">
                   <span>+ Tambah Kategori Baru</span>
                 </button>
               </div>
@@ -596,23 +769,35 @@ onMounted(loadOptions);
           <div class="flex items-center justify-between border-b border-slate-100 pb-2 px-0.5 gap-2">
 
             <template v-if="!isNotesFocused && typeId !== 3">
-              <button type="button" @click="openWalletPicker(typeId === 1 || typeId === 4 ? 'dest' : 'source')"
+              <button type="button"
+                @click="openWalletPicker(isDebtOrReceivable ? debtWalletMode : (typeId === 1 ? 'dest' : 'source'))"
                 class="h-[38px] px-2.5 bg-accent-light hover:opacity-90 border border-accent/20 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 shadow-2xs max-w-[110px]">
                 <span class="text-xs shrink-0 flex items-center justify-center">
                   <component
-                    :is="resolveIcon((typeId === 1 || typeId === 4 ? selectedDestWallet : selectedSourceWallet)?.icon)"
-                    v-if="resolveIcon((typeId === 1 || typeId === 4 ? selectedDestWallet : selectedSourceWallet)?.icon)"
+                    :is="resolveIcon((isDebtOrReceivable ? selectedDebtWallet : (typeId === 1 ? selectedDestWallet : selectedSourceWallet))?.icon)"
+                    v-if="resolveIcon((isDebtOrReceivable ? selectedDebtWallet : (typeId === 1 ? selectedDestWallet : selectedSourceWallet))?.icon)"
                     :size="16" />
-                  <span v-else>{{ (typeId === 1 || typeId === 4 ? selectedDestWallet : selectedSourceWallet)?.icon ||
+                  <span v-else>{{ (isDebtOrReceivable ? selectedDebtWallet : (typeId === 1 ? selectedDestWallet :
+                    selectedSourceWallet))?.icon ||
                     '💵' }}</span>
                 </span>
-                <span class="truncate text-[11px]">{{ (typeId === 1 || typeId === 4 ? selectedDestWallet :
-                  selectedSourceWallet)?.name || 'Dompet' }}</span>
+                <span class="truncate text-[11px]">{{ (isDebtOrReceivable ? selectedDebtWallet : (typeId === 1 ?
+                  selectedDestWallet : selectedSourceWallet))?.name || 'Dompet' }}</span>
                 <span class="text-[9px] text-accent shrink-0">▾</span>
               </button>
             </template>
 
-            <div :class="[isNotesFocused || typeId === 3 ? 'w-full' : 'flex-1 min-w-0']" class="transition-all">
+            <div :class="[isNotesFocused || typeId === 3 ? 'w-full' : 'flex-1 min-w-0']"
+              class="transition-all space-y-2">
+              <div v-if="isDebtOrReceivable" class="w-full">
+                <input v-model="partyName" type="text" list="subject-list"
+                  :placeholder="typeId === 4 ? 'Nama Pemberi Hutang' : 'Nama Peminjam'"
+                  class="w-full h-[38px] bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 px-3 focus:outline-none focus:border-accent focus:bg-white transition-all truncate" />
+                <datalist id="subject-list">
+                  <option v-for="s in subjects" :key="s" :value="s" />
+                </datalist>
+              </div>
+
               <div v-if="isNotesFocused" class="space-y-1.5">
                 <textarea v-model="notes" @blur="isNotesFocused = false" rows="3" placeholder="Catatan..."
                   class="w-full bg-slate-50 border border-accent rounded-xl text-xs font-semibold text-slate-800 p-2.5 focus:outline-none focus:bg-white resize-none leading-relaxed shadow-2xs"
@@ -620,7 +805,7 @@ onMounted(loadOptions);
                 <div class="flex items-center justify-between">
                   <span class="text-[10px] text-slate-400 font-bold">Catatan Transaksi</span>
                   <button @mousedown.prevent="isNotesFocused = false"
-                    class="px-2.5 py-1 bg-accent bg-accent-hover text-white rounded-lg text-xs font-extrabold shadow-2xs">
+                    class="px-2.5 py-1 bg-accent text-white rounded-lg text-xs font-extrabold shadow-2xs">
                     Selesai
                   </button>
                 </div>
@@ -634,7 +819,7 @@ onMounted(loadOptions);
               <span class="text-xs font-black text-slate-400">Rp</span>
               <span class="text-xl font-black text-slate-900 tracking-tight">{{ Number(amountStr ||
                 0).toLocaleString('id-ID')
-              }}</span>
+                }}</span>
             </div>
 
           </div>
@@ -648,24 +833,26 @@ onMounted(loadOptions);
               <span class="truncate">{{ formattedDateLabel }}</span>
             </button>
 
+            <!-- Scan Struk (AI) -->
+            <button type="button" @click="triggerOcrUpload" :disabled="ocrLoading"
+              class="flex-1 py-2 px-2.5 bg-indigo-50 border border-indigo-200/80 text-indigo-600 hover:bg-indigo-100 rounded-xl text-xs font-black transition-colors flex items-center justify-center gap-1.5 min-w-0"
+              title="Scan Struk / Bukti Transaksi dengan AI">
+              <PhCamera :size="16" class="shrink-0" />
+              <span class="truncate">{{ ocrLoading ? 'Scanning...' : 'Scan Struk' }}</span>
+            </button>
+            <input type="file" ref="ocrFileInput" class="hidden" accept="image/*" @change="handleOcrFileChange" />
+
             <button type="button" @click="showKeypad = !showKeypad" :class="[
-              'py-2 px-3 border rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0',
+              'h-[36px] w-[36px] border rounded-xl transition-all flex items-center justify-center shrink-0',
               showKeypad
                 ? 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                 : 'bg-accent-light text-accent border-accent/20'
             ]" :title="showKeypad ? 'Sembunyikan Papan Ketik' : 'Tampilkan Papan Ketik'">
-              <PhKeyboard :size="16" />
-              <span>{{ showKeypad ? 'Sembunyi' : 'Keypad' }}</span>
-            </button>
-
-            <button v-if="editTransaction" type="button" @click="triggerDelete" :disabled="loading"
-              class="py-2 px-3 bg-rose-50 border border-rose-200 text-rose-500 hover:bg-rose-100 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
-              title="Hapus Transaksi">
-              <PhTrash :size="16" />
+              <PhKeyboard :size="18" />
             </button>
 
             <button type="button" @click="handleSubmit" :disabled="loading"
-              class="flex-1 py-2 px-3 bg-accent bg-accent-hover active:scale-98 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 min-w-0">
+              class="flex-1 py-2 px-3 bg-accent active:scale-98 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 min-w-0">
               <PhFloppyDisk :size="16" class="shrink-0" />
               <span class="truncate">{{ loading ? '...' : 'Simpan' }}</span>
             </button>
@@ -711,30 +898,15 @@ onMounted(loadOptions);
       </div>
     </Teleport>
 
-    <Teleport to="body">
-      <div v-if="showDeleteConfirm"
-        class="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-        <div class="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-4 text-center">
-          <div class=" p-4 rounded-full inline-flex">
-            <PhWarning :size="52" color="#ec2727" />
-          </div>
-          <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Konfirmasi Hapus</h3>
-          <p class="text-xs text-slate-500 font-semibold leading-relaxed">Apakah Anda yakin ingin menghapus transaksi
-            ini?
-          </p>
-          <div class="flex gap-2.5 pt-1">
-            <button @click="showDeleteConfirm = false"
-              class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200">
-              Batal
-            </button>
-            <button @click="confirmDelete"
-              class="flex-1 py-2 bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-500/25">
-              Ya, Hapus
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ConfirmDeleteModal
+      v-model:show="showDeleteConfirm"
+      title="Konfirmasi Hapus"
+      message="Apakah Anda yakin ingin menghapus transaksi ini?"
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false"
+    />
 
     <Teleport to="body">
       <div v-if="showAddCategorySheet"
@@ -743,7 +915,7 @@ onMounted(loadOptions);
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showAddCategorySheet = false"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1">
-            <PhArrowLeft :size="24" weight="bold"/>
+            <PhArrowLeft :size="24" weight="bold" />
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Tambah Kategori</h3>
           <div class="w-12"></div>
@@ -761,7 +933,7 @@ onMounted(loadOptions);
             <div class="flex-1 overflow-y-auto p-3 bg-white border border-slate-200 rounded-2xl space-y-4 no-scrollbar">
               <div v-for="g in ICON_GROUPS" :key="g.group" class="space-y-1.5">
                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider block px-1">{{ g.group
-                  }}</span>
+                }}</span>
                 <div class="grid grid-cols-4 gap-2">
                   <button v-for="ico in g.icons" :key="ico.name" type="button" @click="newCatIcon = ico.name"
                     class="aspect-square rounded-2xl flex items-center justify-center transition-all hover:bg-slate-100 border border-slate-100 shrink-0"
@@ -777,7 +949,7 @@ onMounted(loadOptions);
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
           <button @click="handleAddCategory"
-            class="w-full py-3 bg-accent bg-accent-hover text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25">
+            class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25">
             Simpan Kategori
           </button>
         </div>
@@ -791,7 +963,7 @@ onMounted(loadOptions);
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showEditCategorySheet = false"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1">
-            <PhArrowLeft :size="24" weight="bold"/>
+            <PhArrowLeft :size="24" weight="bold" />
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Ubah Kategori</h3>
           <button @click="handleDeleteCategory"
@@ -810,7 +982,7 @@ onMounted(loadOptions);
             <div class="flex-1 overflow-y-auto p-3 bg-white border border-slate-200 rounded-2xl space-y-4 no-scrollbar">
               <div v-for="g in ICON_GROUPS" :key="g.group" class="space-y-1.5">
                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider block px-1">{{ g.group
-                  }}</span>
+                }}</span>
                 <div class="grid grid-cols-4 gap-2">
                   <button v-for="ico in g.icons" :key="ico.name" type="button" @click="editCatIcon = ico.name"
                     class="aspect-square rounded-2xl flex items-center justify-center transition-all hover:bg-slate-100 border border-slate-100 shrink-0"
@@ -826,7 +998,7 @@ onMounted(loadOptions);
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
           <button @click="handleUpdateCategory"
-            class="w-full py-3 bg-accent bg-accent-hover text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25">
+            class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25">
             Simpan Perubahan
           </button>
         </div>

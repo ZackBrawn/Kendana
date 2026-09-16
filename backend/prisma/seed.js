@@ -2,9 +2,9 @@ const { prisma } = require('../config/db');
 const bcrypt = require('bcryptjs');
 
 async function main() {
-  console.log('🌱 Starting database seeding with expanded test datasets...');
+  console.log('Starting database seeding with expanded test datasets...');
 
-  // 1. Ensure Transaction Types exist
+  // 1. ensure transaction types exist
   const typesData = [
     { id: 1, name: 'Income' },
     { id: 2, name: 'Expense' },
@@ -21,7 +21,7 @@ async function main() {
     });
   }
 
-  // 2. Create or Reset Demo User
+  // 2. create or reset demo user
   const hashedPassword = await bcrypt.hash('password123', 10);
   const user = await prisma.user.upsert({
     where: { email: 'user@demo.com' },
@@ -37,46 +37,48 @@ async function main() {
     }
   });
 
-  console.log(`👤 User created/verified: ${user.email} (id: ${user.id})`);
+  console.log(`User created/verified: ${user.email} (id: ${user.id})`);
 
-  // Clear existing user data for clean seeding
+  // 3. clear existing user data for clean seeding
   await prisma.transactionLog.deleteMany({ where: { user_id: user.id } });
+  await prisma.budget.deleteMany({ where: { user_id: user.id } });
   await prisma.category.deleteMany({ where: { user_id: user.id } });
   await prisma.wallet.deleteMany({ where: { user_id: user.id } });
+  await prisma.netWorthSnapshot.deleteMany({ where: { user_id: user.id } });
 
-  // 3. Create 10 Active Wallets (+ 3 System Wallets)
-  const walletCash = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'Uang Tunai / Cash', balance: 5000000, group_type: 'Liquid', icon: 'PhMoney', is_pinned: true }
-  });
+  // 4. create 10 active wallets using finlogos icons
   const walletBca = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'Bank BCA', balance: 45000000, group_type: 'Liquid', icon: 'PhBank', is_pinned: true }
+    data: { user_id: user.id, name: 'Bank BCA', balance: 25000000, group_type: 'Liquid', icon: 'Phbca' }
   });
   const walletMandiri = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'Bank Mandiri', balance: 30000000, group_type: 'Liquid', icon: 'PhBank', is_pinned: true }
+    data: { user_id: user.id, name: 'Bank Mandiri', balance: 15000000, group_type: 'Liquid', icon: 'Phmandiri' }
+  });
+  const walletBni = await prisma.wallet.create({
+    data: { user_id: user.id, name: 'Bank BNI', balance: 10000000, group_type: 'Liquid', icon: 'Phbni' }
+  });
+  const walletBri = await prisma.wallet.create({
+    data: { user_id: user.id, name: 'Bank BRI', balance: 8000000, group_type: 'Liquid', icon: 'Phbri' }
+  });
+  const walletJago = await prisma.wallet.create({
+    data: { user_id: user.id, name: 'Bank Jago', balance: 5000000, group_type: 'Liquid', icon: 'Phjago' }
+  });
+  const walletSeabank = await prisma.wallet.create({
+    data: { user_id: user.id, name: 'SeaBank', balance: 3000000, group_type: 'Liquid', icon: 'Phseabank' }
   });
   const walletGopay = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'GoPay e-Wallet', balance: 4500000, group_type: 'Liquid', icon: 'PhDeviceMobile', is_pinned: true }
+    data: { user_id: user.id, name: 'GoPay', balance: 2500000, group_type: 'Liquid', icon: 'Phgopay' }
   });
   const walletOvo = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'OVO e-Wallet', balance: 2500000, group_type: 'Liquid', icon: 'PhSparkle', is_pinned: true }
-  });
-  const walletShopeePay = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'ShopeePay e-Wallet', balance: 2000000, group_type: 'Liquid', icon: 'PhBag', is_pinned: true }
+    data: { user_id: user.id, name: 'OVO', balance: 1500000, group_type: 'Liquid', icon: 'Phovo' }
   });
   const walletDana = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'DANA e-Wallet', balance: 3500000, group_type: 'Liquid', icon: 'PhCreditCard', is_pinned: true }
+    data: { user_id: user.id, name: 'DANA', balance: 2000000, group_type: 'Liquid', icon: 'Phdana' }
   });
-  const walletCreditCard = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'Kartu Kredit', balance: 0, group_type: 'Liquid', icon: 'PhCreditCard', is_pinned: true }
-  });
-  const walletBibit = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'Investasi Bibit', balance: 15000000, group_type: 'Liquid', icon: 'PhTrendUp', is_pinned: true }
-  });
-  const walletCrypto = await prisma.wallet.create({
-    data: { user_id: user.id, name: 'Crypto Wallet', balance: 10000000, group_type: 'Liquid', icon: 'PhCoins', is_pinned: true }
+  const walletLinkaja = await prisma.wallet.create({
+    data: { user_id: user.id, name: 'LinkAja', balance: 1000000, group_type: 'Liquid', icon: 'Phlinkaja' }
   });
 
-  // System Wallets
+  // system wallets
   const walletMerchant = await prisma.wallet.create({
     data: { user_id: user.id, name: 'External Merchant', balance: 0, group_type: 'System', icon: 'PhShoppingCart' }
   });
@@ -87,55 +89,40 @@ async function main() {
     data: { user_id: user.id, name: 'System Piutang', balance: 0, group_type: 'System', icon: 'PhArrowUpRight' }
   });
 
-  // Track balances locally for realistic sequence calculations
+  // track balances locally for realistic sequence calculations
   const balances = {
-    [walletCash.id]: 5000000,
-    [walletBca.id]: 45000000,
-    [walletMandiri.id]: 30000000,
-    [walletGopay.id]: 4500000,
-    [walletOvo.id]: 2500000,
-    [walletShopeePay.id]: 2000000,
-    [walletDana.id]: 3500000,
-    [walletCreditCard.id]: 0,
-    [walletBibit.id]: 15000000,
-    [walletCrypto.id]: 10000000,
+    [walletBca.id]: 25000000,
+    [walletMandiri.id]: 15000000,
+    [walletBni.id]: 10000000,
+    [walletBri.id]: 8000000,
+    [walletJago.id]: 5000000,
+    [walletSeabank.id]: 3000000,
+    [walletGopay.id]: 2500000,
+    [walletOvo.id]: 1500000,
+    [walletDana.id]: 2000000,
+    [walletLinkaja.id]: 1000000,
     [walletMerchant.id]: 0,
     [walletHutang.id]: 0,
     [walletPiutang.id]: 0
   };
 
-  // 4. Create 30 Expense Categories (type_id = 2) using Phosphor Icons
+  // 5. create exactly 15 expense categories (type_id = 2) using phosphor icons
   const expData = [
-    { name: 'Makanan Utama', icon: 'PhHamburger' },
-    { name: 'Kopi & Cafe', icon: 'PhCoffee' },
-    { name: 'Camilan & Jajanan', icon: 'PhCookie' },
-    { name: 'Bensin & Pertamax', icon: 'PhGasPump' },
-    { name: 'Transportasi Online', icon: 'PhCar' },
-    { name: 'Parkir & Tol', icon: 'PhTicket' },
-    { name: 'Listrik & PLN', icon: 'PhLightning' },
-    { name: 'Air PDAM', icon: 'PhDrop' },
-    { name: 'Internet & Wi-Fi', icon: 'PhWifiHigh' },
-    { name: 'Pulsa & Paket Data', icon: 'PhDeviceMobile' },
-    { name: 'Streaming & Hiburan', icon: 'PhPlayCircle' },
-    { name: 'Bioskop & Film', icon: 'PhFilmStrip' },
-    { name: 'Game & Steam', icon: 'PhGameController' },
+    { name: 'Makanan & Minuman', icon: 'PhForkKnife' },
+    { name: 'Transportasi', icon: 'PhCar' },
     { name: 'Belanja Bulanan', icon: 'PhShoppingCart' },
-    { name: 'Pakaian & Fashion', icon: 'PhTShirt' },
-    { name: 'Gadget & Elektronik', icon: 'PhLaptop' },
-    { name: 'Perkakas Rumah', icon: 'PhHouse' },
-    { name: 'Kesehatan & Dokter', icon: 'PhStethoscope' },
-    { name: 'Obat & Vitamin', icon: 'PhPill' },
-    { name: 'Gym & Olahraga', icon: 'PhBarbell' },
-    { name: 'Salon & Barbershop', icon: 'PhScissors' },
-    { name: 'Asuransi & Proteksi', icon: 'PhShieldCheck' },
-    { name: 'Pajak Kendaraan', icon: 'PhFileText' },
-    { name: 'Hewan Peliharaan', icon: 'PhPawPrint' },
-    { name: 'Servis & Reparasi', icon: 'PhWrench' },
-    { name: 'Kado & Hadiah', icon: 'PhGift' },
-    { name: 'Donasi & Amal', icon: 'PhHeart' },
-    { name: 'Edukasi & Buku', icon: 'PhBookOpen' },
-    { name: 'Biaya Admin Bank', icon: 'PhCreditCard' },
-    { name: 'Lain-lain', icon: 'PhDotsThreeCircle' }
+    { name: 'Tagihan & Utilitas', icon: 'PhReceipt' },
+    { name: 'Kesehatan', icon: 'PhFirstAid' },
+    { name: 'Pendidikan', icon: 'PhGraduationCap' },
+    { name: 'Hiburan & Rekreasi', icon: 'PhFilmStrip' },
+    { name: 'Investasi', icon: 'PhTrendUp' },
+    { name: 'Pulsa & Internet', icon: 'PhWifiHigh' },
+    { name: 'Pakaian & Gaya Hidup', icon: 'PhTShirt' },
+    { name: 'Sosial & Donasi', icon: 'PhHeart' },
+    { name: 'Otomotif & Servis', icon: 'PhWrench' },
+    { name: 'Olahraga & Hobi', icon: 'PhBicycle' },
+    { name: 'Hadiah & Kado', icon: 'PhGift' },
+    { name: 'Biaya Lain-lain', icon: 'PhDotsThreeCircle' }
   ];
 
   const expenseCats = [];
@@ -146,18 +133,18 @@ async function main() {
     expenseCats.push(created);
   }
 
-  // 5. Create 10 Income Categories (type_id = 1) using Phosphor Icons
+  // 6. create exactly 10 income categories (type_id = 1) using phosphor icons
   const incData = [
     { name: 'Gaji Utama', icon: 'PhCoins' },
     { name: 'Gaji Lembur', icon: 'PhBriefcase' },
     { name: 'Bonus & THR', icon: 'PhConfetti' },
-    { name: 'Freelance Project', icon: 'PhLaptop' },
-    { name: 'Dividen Saham', icon: 'PhVault' },
+    { name: 'Freelance', icon: 'PhLaptop' },
+    { name: 'Investasi & Dividen', icon: 'PhChartLine' },
     { name: 'Bunga Bank', icon: 'PhBank' },
-    { name: 'Cashback Belanja', icon: 'PhPercent' },
-    { name: 'Uang Saku / Jajan', icon: 'PhMoney' },
-    { name: 'Hadiah & Give-away', icon: 'PhGift' },
-    { name: 'Penjualan Barang', icon: 'PhStorefront' }
+    { name: 'Uang Saku', icon: 'PhWallet' },
+    { name: 'Cashback', icon: 'PhPercent' },
+    { name: 'Penjualan Barang', icon: 'PhStorefront' },
+    { name: 'Pemasukan Lain-lain', icon: 'PhArrowDownLeft' }
   ];
 
   const incomeCats = [];
@@ -168,43 +155,107 @@ async function main() {
     incomeCats.push(created);
   }
 
-  // 6. Create Debt Categories (type_id = 4)
+  // debt and receivable categories (fixed, system categories)
   const debtData = [
-    { name: 'Pinjaman Bank', icon: 'PhBank' },
-    { name: 'Hutang Teman', icon: 'PhUser' }
+    { name: 'Terima Hutang', icon: 'PhArrowDownLeft', system_key: 'LOAN' },
+    { name: 'Bayar Hutang', icon: 'PhArrowUpRight', system_key: 'DEBT_PAYMENT' }
   ];
   const debtCats = [];
   for (const c of debtData) {
     const created = await prisma.category.create({
-      data: { user_id: user.id, type_id: 4, category_name: c.name, icon: c.icon }
+      data: { user_id: user.id, type_id: 4, category_name: c.name, icon: c.icon, system_key: c.system_key }
     });
     debtCats.push(created);
   }
 
-  // 7. Create Receivable Categories (type_id = 5)
   const recData = [
-    { name: 'Piutang Teman', icon: 'PhCoins' },
-    { name: 'Piutang Keluarga', icon: 'PhUsers' }
+    { name: 'Ngasih Piutang', icon: 'PhArrowUpRight', system_key: 'RECEIVABLE' },
+    { name: 'Terima Bayar Piutang', icon: 'PhArrowDownLeft', system_key: 'RECEIVABLE_PAYMENT' }
   ];
   const receivableCats = [];
   for (const c of recData) {
     const created = await prisma.category.create({
-      data: { user_id: user.id, type_id: 5, category_name: c.name, icon: c.icon }
+      data: { user_id: user.id, type_id: 5, category_name: c.name, icon: c.icon, system_key: c.system_key }
     });
     receivableCats.push(created);
   }
 
-  console.log(`🏷️ Created 30 Expense, 10 Income, and Debt/Receivable Categories successfully.`);
+  console.log(`Created 15 Expense, 10 Income, and Debt/Receivable Categories successfully.`);
 
-  // 8. Generate 90 Days of Transactions (3 Months) - Min 5 transactions per day
-  console.log('📅 Simulating 90 Days of Transactions (minimum 5 per day)...');
+  // 7. create 3 budgets
   const now = new Date();
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+  const budgetMakan = await prisma.budget.create({
+    data: {
+      user_id: user.id,
+      name: 'Anggaran Makan & Cafe',
+      limit_amount: 3000000,
+      wallet_scope: 'all',
+      category_scope: 'specific',
+      period_type: 'monthly',
+      start_date: ninetyDaysAgo,
+      is_permanent: true,
+      show_on_dashboard: true,
+      icon: 'PhForkKnife',
+      categories: {
+        create: [
+          { category_id: expenseCats.find(c => c.category_name === 'Makanan & Minuman').id }
+        ]
+      }
+    }
+  });
+
+  const budgetTrans = await prisma.budget.create({
+    data: {
+      user_id: user.id,
+      name: 'Anggaran Transportasi',
+      limit_amount: 1500000,
+      wallet_scope: 'all',
+      category_scope: 'specific',
+      period_type: 'monthly',
+      start_date: ninetyDaysAgo,
+      is_permanent: true,
+      show_on_dashboard: true,
+      icon: 'PhCar',
+      categories: {
+        create: [
+          { category_id: expenseCats.find(c => c.category_name === 'Transportasi').id }
+        ]
+      }
+    }
+  });
+
+  const budgetBelanja = await prisma.budget.create({
+    data: {
+      user_id: user.id,
+      name: 'Anggaran Belanja Bulanan',
+      limit_amount: 4000000,
+      wallet_scope: 'all',
+      category_scope: 'specific',
+      period_type: 'monthly',
+      start_date: ninetyDaysAgo,
+      is_permanent: true,
+      show_on_dashboard: true,
+      icon: 'PhShoppingCart',
+      categories: {
+        create: [
+          { category_id: expenseCats.find(c => c.category_name === 'Belanja Bulanan').id }
+        ]
+      }
+    }
+  });
+
+  console.log(`Created 3 budgets linked to Makanan & Minuman, Transportasi, and Belanja Bulanan.`);
+
+  // 8. generate 90 days of transactions (3 months) - min 5 transactions per day
+  console.log('Simulating 90 Days of Transactions (minimum 5 per day)...');
   let logCount = 0;
 
   for (let day = 90; day >= 1; day--) {
     const baseDate = new Date(now.getTime() - day * 24 * 60 * 60 * 1000);
 
-    // Generate exactly 5 to 7 transactions per day deterministically
+    // generate exactly 5 to 7 transactions per day deterministically
     const dailyCount = 5 + (day % 3);
 
     for (let index = 0; index < dailyCount; index++) {
@@ -212,24 +263,24 @@ async function main() {
       const txTime = new Date(baseDate.getTime());
       txTime.setHours(8 + (index * 2), 15 + ((index * 9) % 60), 0, 0);
 
-      // Determine Transaction Type
-      let typeId = 2; // Default to Expense
+      // determine transaction type
+      let typeId = 2; // default to expense
 
       if (index === 0 && day % 3 === 0) {
-        typeId = 1; // Income
+        typeId = 1; // income
       } else if (index === 1 && day % 5 === 0) {
-        typeId = 3; // Transfer
+        typeId = 3; // transfer
       } else if (index === 2 && day % 12 === 0) {
-        typeId = 4; // Debt
+        typeId = 4; // debt
       } else if (index === 3 && day % 15 === 0) {
-        typeId = 5; // Receivable
+        typeId = 5; // receivable
       }
 
       let sourceWallet, destWallet, category, amount, subject;
 
       if (typeId === 1) {
-        // Income
-        const targets = [walletCash, walletBca, walletMandiri, walletGopay, walletDana];
+        // income
+        const targets = [walletBca, walletMandiri, walletBni, walletBri, walletJago, walletSeabank, walletGopay, walletOvo, walletDana, walletLinkaja];
         destWallet = targets[(day + index) % targets.length];
         sourceWallet = walletMerchant;
 
@@ -240,7 +291,7 @@ async function main() {
         if (category.category_name === 'Gaji Utama') {
           amount = 12500000;
           subject = 'Gaji Bulanan Utama';
-        } else if (category.category_name === 'Freelance Project') {
+        } else if (category.category_name === 'Freelance') {
           amount = 1500000 + (day % 4) * 500000;
           subject = 'Pembayaran Project Freelance';
         } else {
@@ -268,11 +319,11 @@ async function main() {
         });
 
       } else if (typeId === 3) {
-        // Transfer
-        const sourceList = [walletBca, walletMandiri, walletCash];
+        // transfer
+        const sourceList = [walletBca, walletMandiri, walletBni];
         sourceWallet = sourceList[day % sourceList.length];
 
-        const destList = [walletGopay, walletOvo, walletShopeePay, walletDana, walletCash];
+        const destList = [walletJago, walletSeabank, walletGopay, walletOvo, walletDana, walletLinkaja];
         destWallet = destList[(day + index) % destList.length];
 
         if (sourceWallet.id === destWallet.id) {
@@ -304,8 +355,8 @@ async function main() {
         });
 
       } else if (typeId === 4) {
-        // Debt
-        const targets = [walletCash, walletBca, walletMandiri];
+        // debt
+        const targets = [walletBca, walletMandiri, walletBni];
         destWallet = targets[day % targets.length];
         sourceWallet = walletHutang;
 
@@ -335,8 +386,8 @@ async function main() {
         });
 
       } else if (typeId === 5) {
-        // Receivable
-        const sourceList = [walletCash, walletBca, walletGopay];
+        // receivable
+        const sourceList = [walletBca, walletGopay, walletDana];
         sourceWallet = sourceList[day % sourceList.length];
         destWallet = walletPiutang;
 
@@ -366,8 +417,8 @@ async function main() {
         });
 
       } else {
-        // Expense
-        const sourceList = [walletCash, walletBca, walletMandiri, walletGopay, walletOvo, walletShopeePay, walletDana, walletCreditCard];
+        // expense
+        const sourceList = [walletBca, walletMandiri, walletBni, walletBri, walletJago, walletSeabank, walletGopay, walletOvo, walletDana, walletLinkaja];
         sourceWallet = sourceList[(day * 3 + index) % sourceList.length];
         destWallet = walletMerchant;
 
@@ -375,10 +426,10 @@ async function main() {
         category = expenseCats[catIdx];
 
         amount = 15000 + (day % 8) * 12000;
-        if (category.category_name === 'Makanan Utama') {
+        if (category.category_name === 'Makanan & Minuman') {
           subject = ['Nasi Padang Lauk Ayam', 'Ayam Geprek Sambal', 'Bakmi Goreng Spesial', 'Gado-Gado Betawi'][(day + index) % 4];
-        } else if (category.category_name === 'Kopi & Cafe') {
-          subject = 'Es Kopi Susu Aren & Donut';
+        } else if (category.category_name === 'Transportasi') {
+          subject = 'Bensin Motor Harian';
         } else if (category.category_name === 'Belanja Bulanan') {
           amount = 150000 + (day % 4) * 75000;
           subject = 'Beli Sembako & Sayur Supermarket';
@@ -409,8 +460,8 @@ async function main() {
     }
   }
 
-  // 9. Write final simulated balances back to DB
-  console.log('💾 Saving final simulated balances to DB...');
+  // 9. save final simulated balances to db
+  console.log('Saving final simulated balances to DB...');
   for (const walletId of Object.keys(balances)) {
     await prisma.wallet.update({
       where: { id: parseInt(walletId) },
@@ -418,12 +469,12 @@ async function main() {
     });
   }
 
-  console.log(`✅ Seeding complete! Generated ${logCount} transactions over 90 days.`);
+  console.log(`Seeding complete! Generated ${logCount} transactions over 90 days.`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seeding Failed:', e);
+    console.error('Seeding Failed:', e);
     process.exit(1);
   })
   .finally(async () => {

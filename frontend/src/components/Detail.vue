@@ -1,12 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { api, showToast } from '../api';
-import { PhX, PhPencil, PhTrash, PhWarning } from "@phosphor-icons/vue";
-
-
-import * as FinLogos from '../finlogos';
-
+import { PhX, PhPencil, PhTrash } from "@phosphor-icons/vue";
 import { resolveIcon, formatRp } from '../utils/helpers';
+import ConfirmDeleteModal from './ConfirmDeleteModal.vue';
 
 const props = defineProps({
   transaction: {
@@ -129,32 +126,17 @@ const confirmDelete = async () => {
         </div>
       </div>
 
-      <Teleport to="body">
-        <div v-if="showDeleteConfirm"
-          class="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div
-            class="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-4 text-center">
-            <div class=" p-4 rounded-full inline-flex">
-              <PhWarning :size="52" color="#ec2727" />
-            </div>
-            <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Konfirmasi Hapus</h3>
-            <p class="text-xs text-slate-500 font-semibold leading-relaxed">Apakah Anda yakin ingin menghapus transaksi
-              ini?
-            </p>
-            <div class="flex gap-2.5 pt-1">
-              <button @click="showDeleteConfirm = false"
-                class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200">
-                Batal
-              </button>
-              <button @click="confirmDelete"
-                class="flex-1 py-2 bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-500/25">
-                Ya, Hapus
-              </button>
-            </div>
-          </div>
-        </div>
-      </Teleport>
+      <ConfirmDeleteModal
+        v-model:show="showDeleteConfirm"
+        title="Konfirmasi Hapus"
+        message="Apakah Anda yakin ingin menghapus transaksi ini?"
+        confirm-text="Ya, Hapus"
+        cancel-text="Batal"
+        @confirm="confirmDelete"
+        @cancel="showDeleteConfirm = false"
+      />
 
     </div>
   </div>
 </template>
+

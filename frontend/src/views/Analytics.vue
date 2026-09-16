@@ -4,13 +4,15 @@ import { api } from '../api';
 import { PhArrowUpRight, PhArrowDownLeft, PhHandshake, PhCoins, PhX, PhPencil, PhTrash, PhCaretLeft, PhCaretRight, PhCaretDown } from "@phosphor-icons/vue";
 import { Chart, registerables } from 'chart.js';
 import { useDate } from '../composables/useDate';
-import { formatRp, resolveIcon } from '../utils/helpers';
+import { formatRp, resolveIcon, groupTransactionsByDate, calculateGroupTotals } from '../utils/helpers';
 import DateFilter from '../components/DateFilter.vue';
 import Transaction from '../components/Transaction.vue';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
+import { useRoute } from 'vue-router';
 
 Chart.register(...registerables);
 
-const activeTypeId = ref(2); 
+const activeTypeId = ref(2);
 const breakdownType = ref('category');
 const transactions = ref([]);
 
@@ -48,19 +50,7 @@ const loadData = async () => {
   }
 };
 
-const getGroupTotals = (transactions) => {
-  let income = 0;
-  let expense = 0;
-  transactions.forEach(t => {
-    const amt = parseFloat(t.amount || 0);
-    if (t.type_name === 'Income') {
-      income += amt;
-    } else if (t.type_name === 'Expense') {
-      expense += amt;
-    }
-  });
-  return { income, expense };
-};
+const getGroupTotals = (transactions) => calculateGroupTotals(transactions);
 
 const getWalletName = (tx) => {
   if (tx.type_id === 2 || tx.type_id === 5) {
@@ -143,12 +133,17 @@ let chartInstance = null;
 const highlightedIndex = ref(null);
 const hoveredIndex = ref(null);
 
+const barChartCanvas = ref(null);
+let barChartInstance = null;
+const barChartInterval = ref('day'); // 'day', 'week', 'month'
+
 const setHoveredItem = (index) => {
   hoveredIndex.value = index;
 };
 
 const selectedItemHistory = ref(null);
 const collapsedGroups = ref({});
+const route = useRoute();
 
 const TYPE_ITEMS = [
   { id: 2, tab: 'Expense', label: 'Pengeluaran', icon: PhArrowUpRight, activeBg: 'bg-accent text-white', color: '#e11d48' },
@@ -201,21 +196,21 @@ const updateChart = () => {
             meta.data.forEach((element, i) => {
               const dataVal = breakdownData.value[i];
               if (!dataVal) return;
-              
+
               const pct = Math.round(dataVal.percentage);
-              if (pct < 2) return; 
-              
+              if (pct < 2) return;
+
               const startAngle = element.startAngle;
               const endAngle = element.endAngle;
               const midAngle = startAngle + (endAngle - startAngle) / 2;
-              
+
               const innerRadius = element.innerRadius;
               const outerRadius = element.outerRadius;
               const radius = innerRadius + (outerRadius - innerRadius) / 2;
-              
+
               const textX = element.x + Math.cos(midAngle) * radius;
               const textY = element.y + Math.sin(midAngle) * radius;
-              
+
               ctx.save();
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 8px Inter, sans-serif';
@@ -309,9 +304,16 @@ const updateChart = () => {
 
               let innerHtml = '';
 
-              titleLines.forEach(title => {
-                innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
-              });
+              // Avoid duplicate title if body already contains the same label (e.g., "Minggu 1" appears in body)
+              const firstTitle = titleLines.length ? String(titleLines[0]) : '';
+              const firstBodyStr = bodyLines.length ? (Array.isArray(bodyLines[0]) ? bodyLines[0].join(' ') : String(bodyLines[0])) : '';
+              const showTitle = !(firstTitle && firstBodyStr && firstBodyStr.includes(firstTitle));
+
+              if (showTitle) {
+                titleLines.forEach(title => {
+                  innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
+                });
+              }
 
               bodyLines.forEach((body, i) => {
                 const colors = tooltipModel.labelColors[i];
@@ -320,7 +322,7 @@ const updateChart = () => {
                 style += ' border-width: 1px;';
                 style += ' display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;';
                 const span = `<span style="${style}"></span>`;
-                innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${body}</div>`;
+                innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${Array.isArray(body) ? body.join(' ') : body}</div>`;
               });
 
               tooltipEl.innerHTML = innerHtml;
@@ -370,6 +372,292 @@ const openHistory = (item) => {
   collapsedGroups.value = {};
 };
 
+const getWeekNumber = (d) => {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return date.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+};
+
+const getMonthKey = (d) => {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+};
+
+const processBarChartData = (transactions, interval) => {
+  const groups = {};
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+
+  // Monthly interval: show months from January up to the selected month (same year as currentDate)
+  if (interval === 'month') {
+    const sel = currentDate && currentDate.value ? new Date(currentDate.value) : new Date();
+    const year = sel.getFullYear();
+    const selMonth = sel.getMonth(); // 0-based
+
+    // initialize months from Jan .. selected month
+    for (let m = 0; m <= selMonth; m++) {
+      const key = `${year}-${String(m + 1).padStart(2, '0')}`;
+      groups[key] = { label: `${monthNames[m]} ${year}`, total: 0, key };
+    }
+
+    transactions.forEach(t => {
+      if (!t.date) return;
+      const d = new Date(t.date);
+      if (d.getFullYear() !== year) return; // only consider the selected year
+      const m = d.getMonth();
+      if (m > selMonth) return; // ignore months after selected month
+      const key = `${year}-${String(m + 1).padStart(2, '0')}`;
+      if (!groups[key]) groups[key] = { label: `${monthNames[m]} ${year}`, total: 0, key };
+      groups[key].total += parseFloat(t.amount);
+    });
+
+    const sortedKeys = Object.keys(groups).sort();
+    // Show only months that have transactions, but always include the selected month
+    const selKey = `${year}-${String(selMonth + 1).padStart(2, '0')}`;
+    const filteredKeys = sortedKeys.filter(k => (groups[k].total && groups[k].total > 0) || k === selKey);
+
+    return {
+      labels: filteredKeys.map(k => groups[k].label),
+      totals: filteredKeys.map(k => groups[k].total)
+    };
+  }
+
+  // Weekly interval: bucket weeks that belong to the selected month only
+  if (interval === 'week') {
+    const sel = currentDate && currentDate.value ? new Date(currentDate.value) : new Date();
+    const year = sel.getFullYear();
+    const month = sel.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    // offset so weeks start on Monday (0=Sun -> 6)
+    const firstWeekday = firstDayOfMonth.getDay();
+    const offset = (firstWeekday + 6) % 7;
+
+    const daysInMonth = lastDayOfMonth.getDate();
+    const weeksCount = Math.ceil((daysInMonth + offset) / 7);
+
+    // initialize week buckets
+    for (let w = 1; w <= weeksCount; w++) {
+      const key = `${year}-${String(month + 1).padStart(2, '0')}-W${w}`;
+      groups[key] = { label: 'Minggu ' + w, total: 0, key };
+    }
+
+    transactions.forEach(t => {
+      if (!t.date) return;
+      const d = new Date(t.date);
+      if (d.getFullYear() !== year || d.getMonth() !== month) return; // only this month
+      const weekOfMonth = Math.ceil((d.getDate() + offset) / 7);
+      const key = `${year}-${String(month + 1).padStart(2, '0')}-W${weekOfMonth}`;
+      if (!groups[key]) groups[key] = { label: 'Minggu ' + weekOfMonth, total: 0, key };
+      groups[key].total += parseFloat(t.amount);
+    });
+
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const wa = parseInt(a.split('-W')[1], 10);
+      const wb = parseInt(b.split('-W')[1], 10);
+      return wa - wb;
+    });
+
+    // Only show weeks that have transactions
+    const filteredKeys = sortedKeys.filter(k => groups[k].total && groups[k].total > 0);
+
+    return {
+      labels: filteredKeys.map(k => groups[k].label),
+      totals: filteredKeys.map(k => groups[k].total)
+    };
+  }
+
+  // Default (day) behavior: group by exact day
+  transactions.forEach(t => {
+    if (!t.date) return;
+    const d = new Date(t.date);
+    let key = '';
+    let label = '';
+
+    if (interval === 'day') {
+      key = t.date.split('T')[0];
+      label = d.getDate() + ' ' + monthNames[d.getMonth()];
+    } else {
+      // Fallback to month grouping if unknown interval
+      key = getMonthKey(d);
+      label = monthNames[d.getMonth()] + ' ' + d.getFullYear();
+    }
+
+    if (!groups[key]) {
+      groups[key] = { label, total: 0, key };
+    }
+    groups[key].total += parseFloat(t.amount);
+  });
+
+  const sortedKeys = Object.keys(groups).sort();
+  return {
+    labels: sortedKeys.map(k => groups[k].label),
+    totals: sortedKeys.map(k => groups[k].total)
+  };
+};
+
+const updateBarChart = () => {
+  if (!barChartCanvas.value) {
+    setTimeout(() => {
+      if (barChartCanvas.value) updateBarChart();
+    }, 100);
+    return;
+  }
+  
+  if (!selectedItemHistory.value || !selectedItemHistory.value.transactions) {
+    if (barChartInstance) {
+      barChartInstance.destroy();
+      barChartInstance = null;
+    }
+    return;
+  }
+
+  // For monthly interval we need totals across months of the year (Jan..selected month)
+  // so for month use the full set of matching transactions from the global transactions list.
+  let txForChart = selectedItemHistory.value.transactions;
+  if (barChartInterval.value === 'month' && selectedItemHistory.value) {
+    if (breakdownType.value === 'category') {
+      txForChart = transactions.value.filter(t => (t.category_name || 'Lainnya') === selectedItemHistory.value.name);
+    } else {
+      txForChart = transactions.value.filter(t => getWalletName(t) === selectedItemHistory.value.name);
+    }
+  }
+
+  const { labels, totals } = processBarChartData(txForChart, barChartInterval.value);
+
+  if (barChartInstance) {
+    barChartInstance.destroy();
+  }
+
+  if (labels.length === 0) return;
+
+  const isIncome = activeTypeId.value === 1 || activeTypeId.value === 5;
+  const barColor = isIncome ? '#10b981' : '#f43f5e';
+
+  barChartInstance = new Chart(barChartCanvas.value, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Total',
+        data: totals,
+        backgroundColor: barColor,
+        borderRadius: 4,
+        barPercentage: 0.6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external: (context) => {
+            let tooltipEl = document.getElementById('chartjs-tooltip');
+
+            if (!tooltipEl) {
+              tooltipEl = document.createElement('div');
+              tooltipEl.id = 'chartjs-tooltip';
+              tooltipEl.style.background = '#ffffff';
+              tooltipEl.style.borderRadius = '12px';
+              tooltipEl.style.color = '#334155';
+              tooltipEl.style.opacity = 0;
+              tooltipEl.style.pointerEvents = 'none';
+              tooltipEl.style.position = 'absolute';
+              tooltipEl.style.transition = 'all 0.1s ease';
+              tooltipEl.style.zIndex = '100';
+              tooltipEl.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)';
+              tooltipEl.style.border = '1px solid rgba(15, 23, 42, 0.08)';
+              tooltipEl.style.padding = '10px 12px';
+              document.body.appendChild(tooltipEl);
+            }
+
+            const tooltipModel = context.tooltip;
+            if (tooltipModel.opacity === 0) {
+              tooltipEl.style.opacity = 0;
+              return;
+            }
+
+            if (tooltipModel.body) {
+              const titleLines = tooltipModel.title || [];
+              const bodyLines = tooltipModel.body.map(item => item.lines);
+
+              let innerHtml = '';
+
+              // Avoid duplicate title if body already contains the same label (e.g., "Minggu 1" appears in body)
+              const firstTitle = titleLines.length ? String(titleLines[0]) : '';
+              const firstBodyStr = bodyLines.length ? (Array.isArray(bodyLines[0]) ? bodyLines[0].join(' ') : String(bodyLines[0])) : '';
+              const showTitle = !(firstTitle && firstBodyStr && firstBodyStr.includes(firstTitle));
+
+              if (showTitle) {
+                titleLines.forEach(title => {
+                  innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
+                });
+              }
+
+              bodyLines.forEach((body, i) => {
+                const colors = tooltipModel.labelColors[i];
+                let style = `background: ${colors.backgroundColor};`;
+                style += ` border-color: ${colors.borderColor};`;
+                style += ' border-width: 1px;';
+                style += ' display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;';
+                const span = `<span style="${style}"></span>`;
+                innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${Array.isArray(body) ? body.join(' ') : body}</div>`;
+              });
+
+              tooltipEl.innerHTML = innerHtml;
+            }
+
+            const position = context.chart.canvas.getBoundingClientRect();
+            tooltipEl.style.opacity = 1;
+            tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX - (tooltipEl.offsetWidth / 2) + 'px';
+            tooltipEl.style.top = position.top + window.pageYOffset + tooltipModel.caretY - tooltipEl.offsetHeight - 12 + 'px';
+          },
+          callbacks: {
+            label: (context) => ` ${context.label}: ${formatRp(context.raw)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => {
+              if (value >= 1000000) return (value / 1000000) + 'M';
+              if (value >= 1000) return (value / 1000) + 'k';
+              return value;
+            },
+            font: { size: 10 }
+          },
+          grid: { color: '#f1f5f9' }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
+  });
+};
+
+watch(barChartInterval, () => {
+  nextTick(updateBarChart);
+});
+
+watch(selectedItemHistory, (newVal) => {
+  if (newVal) {
+    nextTick(updateBarChart);
+  } else {
+    barChartInterval.value = 'day';
+    if (barChartInstance) {
+      barChartInstance.destroy();
+      barChartInstance = null;
+    }
+  }
+});
+
 const isGroupCollapsed = (dateStr) => !!collapsedGroups.value[dateStr];
 const toggleGroup = (dateStr) => {
   collapsedGroups.value[dateStr] = !collapsedGroups.value[dateStr];
@@ -377,18 +665,7 @@ const toggleGroup = (dateStr) => {
 
 const itemGroupedTransactions = computed(() => {
   if (!selectedItemHistory.value) return [];
-  const groups = {};
-  selectedItemHistory.value.transactions.forEach(t => {
-    const dateStr = t.date ? t.date.split('T')[0] : 'Unknown';
-    if (!groups[dateStr]) {
-      groups[dateStr] = {
-        date: dateStr,
-        transactions: []
-      };
-    }
-    groups[dateStr].transactions.push(t);
-  });
-  return Object.values(groups).sort((a, b) => b.date.localeCompare(a.date));
+  return groupTransactionsByDate(selectedItemHistory.value.transactions);
 });
 
 const formatGroupDateLabel = (dateStr) => {
@@ -449,7 +726,7 @@ const confirmDelete = async () => {
   loading.value = true;
   try {
     await api.deleteTransaction(transactionToDelete.value.id);
-    
+
     if (selectedItemHistory.value) {
       selectedItemHistory.value.transactions = selectedItemHistory.value.transactions.filter(
         t => t.id !== transactionToDelete.value.id
@@ -476,6 +753,30 @@ const handleGlobalClick = (event) => {
     highlightedIndex.value = null;
   }
 };
+
+// Watch for incoming route query from Other -> Analytics to auto-open category history
+watch(() => route.query.openCategoryId, async (newId) => {
+  if (!newId) return;
+
+  // if caller provided a type (income/expense), apply it so breakdown matches
+  if (route.query.type) {
+    activeTypeId.value = parseInt(route.query.type);
+  }
+
+  // ensure transactions are loaded
+  if (transactions.value.length === 0) {
+    await loadData();
+  }
+
+  // wait for computed breakdownData to settle
+  await nextTick();
+
+  const idNum = parseInt(newId);
+  const found = breakdownData.value.find(item => item.transactions && item.transactions.some(t => Number(t.category_id) === idNum));
+  if (found) {
+    openHistory(found);
+  }
+}, { immediate: true });
 
 onMounted(async () => {
   window.addEventListener('click', handleGlobalClick);
@@ -562,11 +863,8 @@ onUnmounted(() => {
       </div>
 
       <div class="space-y-2">
-        <div v-for="(item, index) in breakdownData" :key="item.name"
-          :id="'breakdown-item-' + index"
-          @click="openHistory(item)"
-          @mouseenter="setHoveredItem(index)"
-          @mouseleave="setHoveredItem(null)"
+        <div v-for="(item, index) in breakdownData" :key="item.name" :id="'breakdown-item-' + index"
+          @click="openHistory(item)" @mouseenter="setHoveredItem(index)" @mouseleave="setHoveredItem(null)"
           class="flex items-center justify-between p-2 rounded-2xl border transition-all duration-200 active:scale-[0.99] select-none relative cursor-pointer"
           :class="[
             highlightedIndex === index
@@ -637,83 +935,75 @@ onUnmounted(() => {
             </span>
           </div>
 
-          <div class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3.5 bg-slate-50">
-            <div v-for="group in itemGroupedTransactions" :key="group.date" class="mb-3.5 last:mb-0 shadow-md rounded-2xl">
-              <div @click="toggleGroup(group.date)"
-                class="flex items-center justify-between cursor-pointer select-none px-3.5 py-2.5 bg-slate-100 border border-slate-200/50 hover:bg-slate-200/50 transition-all"
-                :class="isGroupCollapsed(group.date) ? 'rounded-xl' : 'rounded-t-xl border-b-0'">
-                <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                  {{ formatGroupDateLabel(group.date) }}
-                </span>
-                <div class="flex items-center gap-x-2.5 ml-auto mr-2.5 text-[9px] font-black tracking-wider text-slate-500">
-                  <span v-if="(activeTypeId === 1 || activeTypeId === 5) && getGroupTotals(group.transactions).income > 0">
-                    + {{ formatRp(getGroupTotals(group.transactions).income) }}
-                  </span>
-                  <span v-if="(activeTypeId === 2 || activeTypeId === 4) && getGroupTotals(group.transactions).expense > 0">
-                    - {{ formatRp(getGroupTotals(group.transactions).expense) }}
-                  </span>
-                </div>
-                <PhCaretDown :size="14" weight="fill" class="text-accent transition-transform duration-700"
-                  :class="{ '-rotate-180': isGroupCollapsed(group.date) }" />
+          <div class="flex-1 overflow-y-auto no-scrollbar bg-slate-50">
+            <!-- Bar Chart Section -->
+            <div class="px-4 pt-4 pb-2">
+              <div class="flex bg-slate-200/60 p-1 rounded-xl mb-4 w-full">
+                <button
+                  v-for="interval in [{ id: 'day', label: 'Harian' }, { id: 'week', label: 'Mingguan' }, { id: 'month', label: 'Bulanan' }]"
+                  :key="interval.id" @click="barChartInterval = interval.id"
+                  class="flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all"
+                  :class="barChartInterval === interval.id ? 'bg-white text-accent shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                  {{ interval.label }}
+                </button>
               </div>
+              <div class="h-40 w-full relative">
+                <canvas ref="barChartCanvas"></canvas>
+              </div>
+            </div>
 
-              <div v-show="!isGroupCollapsed(group.date)"
-                class="bg-white border border-slate-200/80 rounded-b-2xl rounded-t-none divide-y divide-slate-100 shadow-xs overflow-hidden">
-                <Transaction
-                  v-for="t in group.transactions"
-                  :key="t.id"
-                  :transaction="t"
-                  :hide-values="false"
-                  @click="handleTransactionClick"
-                  @edit="handleSwipeEdit"
-                  @delete="handleSwipeDelete"
-                />
+            <!-- Transaction List -->
+            <div class="p-4 space-y-3.5 border-t border-slate-200/50 mt-2">
+              <div v-for="group in itemGroupedTransactions" :key="group.date"
+                class="mb-3.5 last:mb-0 shadow-md rounded-2xl">
+                <div @click="toggleGroup(group.date)"
+                  class="flex items-center justify-between cursor-pointer select-none px-3.5 py-2.5 bg-slate-100 border border-slate-200/50 hover:bg-slate-200/50 transition-all"
+                  :class="isGroupCollapsed(group.date) ? 'rounded-xl' : 'rounded-t-xl border-b-0'">
+                  <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                    {{ formatGroupDateLabel(group.date) }}
+                  </span>
+                  <div
+                    class="flex items-center gap-x-2.5 ml-auto mr-2.5 text-[9px] font-black tracking-wider text-slate-500">
+                    <span
+                      v-if="(activeTypeId === 1 || activeTypeId === 5) && getGroupTotals(group.transactions).income > 0">
+                      + {{ formatRp(getGroupTotals(group.transactions).income) }}
+                    </span>
+                    <span
+                      v-if="(activeTypeId === 2 || activeTypeId === 4) && getGroupTotals(group.transactions).expense > 0">
+                      - {{ formatRp(getGroupTotals(group.transactions).expense) }}
+                    </span>
+                  </div>
+                  <PhCaretDown :size="14" weight="fill" class="text-accent transition-transform duration-700"
+                    :class="{ '-rotate-180': isGroupCollapsed(group.date) }" />
+                </div>
+
+                <div v-show="!isGroupCollapsed(group.date)"
+                  class="bg-white border border-slate-200/80 rounded-b-2xl rounded-t-none divide-y divide-slate-100 shadow-xs overflow-hidden">
+                  <Transaction v-for="t in group.transactions" :key="t.id" :transaction="t" :hide-values="false"
+                    @click="handleTransactionClick" @edit="handleSwipeEdit" @delete="handleSwipeDelete" />
+                </div>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </Teleport>
 
     <!-- Delete Confirmation -->
-    <Teleport to="body">
-      <div v-if="showDeleteConfirm"
-        class="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-5 max-w-xs w-full shadow-2xl border border-slate-100 text-center space-y-4">
-          <div
-            class="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-500">
-            <PhTrash :size="24" />
-          </div>
-          <div class="space-y-1">
-            <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider">Hapus Transaksi?</h4>
-            <p class="text-[10px] text-slate-455 font-bold leading-normal">Tindakan ini tidak bisa dibatalkan.</p>
-          </div>
-          <div class="flex gap-2">
-            <button @click="showDeleteConfirm = false"
-              class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider rounded-xl cursor-pointer">
-              Batal
-            </button>
-            <button @click="confirmDelete"
-              class="flex-1 py-2 bg-rose-500 hover:bg-rose-700 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl shadow-xs cursor-pointer">
-              Hapus
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ConfirmDeleteModal
+      v-model:show="showDeleteConfirm"
+      title="Hapus Transaksi?"
+      message="Tindakan ini tidak bisa dibatalkan."
+      confirm-text="Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false"
+    />
 
     <!-- Modular Date Filter Modal -->
-    <DateFilter
-      v-if="showFilterModal"
-      :filter-type="filterType"
-      :presets-list="presetsList"
-      :start-date="customStartDate"
-      :end-date="customEndDate"
-      @close="showFilterModal = false"
-      @apply-preset="handleApplyPreset"
-      @apply-custom="handleApplyCustom"
-    />
+    <DateFilter v-if="showFilterModal" :filter-type="filterType" :presets-list="presetsList"
+      :start-date="customStartDate" :end-date="customEndDate" @close="showFilterModal = false"
+      @apply-preset="handleApplyPreset" @apply-custom="handleApplyCustom" />
 
   </div>
 </template>

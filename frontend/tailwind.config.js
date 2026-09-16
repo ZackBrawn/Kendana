@@ -13,9 +13,15 @@ export default {
           500: '#6366f1',
           600: '#4f46e5',
           700: '#4338ca',
+        },
+        accent: {
+          DEFAULT: 'var(--color-primary)',
+          hover: 'var(--color-primary-hover)',
+          light: 'var(--color-primary-light)',
         }
       }
     },
   },
   plugins: [],
 }
+

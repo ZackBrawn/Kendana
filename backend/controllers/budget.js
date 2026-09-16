@@ -1,4 +1,6 @@
 const { prisma } = require('../config/db');
+const { generateBudget, getBudgetSummary } = require('../services/aiBudgetService');
+const { sendNotificationToUser } = require('./push');
 
 // Helper to calculate the active period cycle of a budget
 function calculateCurrentCycle(budget, today = new Date()) {
@@ -163,6 +165,26 @@ async function getBudgetSpentAndTransactions(budget, today = new Date()) {
     }))
   };
 }
+
+exports.notifyOverbudgetForUser = async (userId) => {
+  const budgets = await prisma.budget.findMany({
+    where: { user_id: userId, notify_on_threshold: true },
+    include: { categories: true }
+  });
+
+  for (const budget of budgets) {
+    const stats = await getBudgetSpentAndTransactions(budget, new Date());
+    const threshold = budget.notify_threshold_percent || 100;
+    if (stats.percentage_used >= threshold) {
+      await sendNotificationToUser(userId, {
+        title: `Budget: ${budget.name}`,
+        body: `Penggunaan budget mencapai ${Math.round(stats.percentage_used)}% dari batas yang ditentukan.`,
+        url: `/budgets/${budget.id}`,
+        tag: `kendana-budget-${budget.id}`
+      });
+    }
+  }
+};
 
 // Input validation
 const validateBudgetInput = async (userId, body) => {
@@ -511,3 +533,216 @@ exports.deleteBudget = async (req, res) => {
 
 // Export helper for testing
 exports.calculateCurrentCycle = calculateCurrentCycle;
+
+// AI Budgeting - Settings
+exports.getSettings = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+    res.json({
+      auto_budget_enabled: !!user.auto_budget_enabled,
+      bot_name: user.bot_display_name || user.bot_name,
+      bot_avatar: user.bot_avatar || '🤖'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.updateSettings = async (req, res) => {
+  const { auto_budget_enabled } = req.body;
+  if (auto_budget_enabled === undefined) {
+    return res.status(400).json({ error: 'auto_budget_enabled wajib diisi' });
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { auto_budget_enabled: auto_budget_enabled === true || auto_budget_enabled === 'true' }
+    });
+    res.json({ success: true, message: 'Settings updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// AI Budgeting - Generate (accepts year and month)
+exports.generate = async (req, res) => {
+  const { year, month } = req.body;
+  if (!year || !month) {
+    return res.status(400).json({ error: 'Tahun dan bulan wajib diisi' });
+  }
+
+  const numYear = parseInt(year);
+  const numMonth = parseInt(month);
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (numYear !== currentYear || numMonth !== currentMonth) {
+    return res.status(422).json({
+      error: 'Budget AI hanya dapat dibuat untuk bulan berjalan. Pilih bulan sekarang.'
+    });
+  }
+
+  try {
+    await prisma.budgetGenerationStatus.upsert({
+      where: {
+        user_id_year_month: {
+          user_id: req.user.id,
+          year: numYear,
+          month: numMonth
+        }
+      },
+      update: {
+        status: 'pending',
+        error_message: null
+      },
+      create: {
+        user_id: req.user.id,
+        year: numYear,
+        month: numMonth,
+        status: 'pending'
+      }
+    });
+
+    // Start background generation using the service
+    generateBudget(req.user.id, numMonth, numYear)
+      .catch(err => console.error('Background budget generation error:', err));
+
+    res.status(202).json({
+      queued: true,
+      status: 'pending'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// AI Budgeting - Status (polling)
+exports.generationStatus = async (req, res) => {
+  const { year, month } = req.query;
+  if (!year || !month) {
+    return res.status(400).json({ error: 'Tahun dan bulan wajib diisi' });
+  }
+
+  const numYear = parseInt(year);
+  const numMonth = parseInt(month);
+
+  try {
+    const statusObj = await prisma.budgetGenerationStatus.findFirst({
+      where: { user_id: req.user.id, year: numYear, month: numMonth }
+    });
+
+    if (!statusObj) {
+      return res.json({ status: 'idle', error_message: null });
+    }
+
+    const minutesDiff = (new Date() - new Date(statusObj.updated_at)) / (1000 * 60);
+    const isStuck = ['pending', 'processing'].includes(statusObj.status) && minutesDiff > 5;
+
+    if (isStuck) {
+      const updated = await prisma.budgetGenerationStatus.update({
+        where: { id: statusObj.id },
+        data: { status: 'failed', error_message: 'Proses generate timeout. Silakan coba lagi.' }
+      });
+      return res.json({ status: 'failed', error_message: updated.error_message });
+    }
+
+    res.json({
+      status: statusObj.status,
+      error_message: statusObj.error_message
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// AI Budgeting - Show details and summary for month/year
+exports.showBudgetGroup = async (req, res) => {
+  const { year, month } = req.params;
+  const numYear = parseInt(year);
+  const numMonth = parseInt(month);
+
+  try {
+    const budgetGroup = await prisma.budgetGroup.findFirst({
+      where: { user_id: req.user.id, period_month: numMonth, period_year: numYear },
+      include: {
+        items: true,
+        expenseGroups: true
+      }
+    });
+
+    if (!budgetGroup) {
+      return res.status(404).json({ error: 'Budget not found for this period.' });
+    }
+
+    const summary = await getBudgetSummary(budgetGroup.id, req.user.id);
+
+    res.json({
+      ...budgetGroup,
+      summary
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// AI Budgeting - Update target amounts inside the group
+exports.updateBudgetGroup = async (req, res) => {
+  const budgetGroupId = parseInt(req.params.budgetGroupId);
+  const { items } = req.body; // array of { id, target_amount }
+
+  if (!items || !Array.isArray(items)) {
+    return res.status(400).json({ error: 'Daftar item budget wajib diisi' });
+  }
+
+  try {
+    const budgetGroup = await prisma.budgetGroup.findFirst({
+      where: { id: budgetGroupId, user_id: req.user.id }
+    });
+
+    if (!budgetGroup) {
+      return res.status(404).json({ error: 'Budget group tidak ditemukan' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      let totalAmount = 0;
+
+      for (const itemData of items) {
+        const item = await tx.budgetItem.findFirst({
+          where: { id: parseInt(itemData.id), budget_group_id: budgetGroupId }
+        });
+
+        if (item && item.budgetable_type === 'Category') {
+          const amt = parseFloat(itemData.target_amount || 0);
+          await tx.budgetItem.update({
+            where: { id: item.id },
+            data: { target_amount: amt }
+          });
+          totalAmount += amt;
+        }
+      }
+
+      const updated = await tx.budgetGroup.update({
+        where: { id: budgetGroupId },
+        data: {
+          total_budget_amount: totalAmount,
+          generated_by: 'manual' // Mark as edited manually
+        },
+        include: {
+          items: true,
+          expenseGroups: true
+        }
+      });
+
+      return updated;
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

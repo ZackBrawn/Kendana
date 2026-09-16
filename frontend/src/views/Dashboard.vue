@@ -5,9 +5,11 @@ import { api, showToast } from '../api';
 import { PhWarning, PhEye, PhEyeSlash, PhCaretLeft, PhCaretRight, PhCaretDown, PhCaretUp, PhPiggyBank } from "@phosphor-icons/vue";
 import { Chart, registerables } from 'chart.js';
 import { useDate } from '../composables/useDate';
-import { formatRp, resolveIcon } from '../utils/helpers';
+import { formatRp, resolveIcon, groupTransactionsByDate, calculateGroupTotals, formatGroupDate } from '../utils/helpers';
 import DateFilter from '../components/DateFilter.vue';
 import Transaction from '../components/Transaction.vue';
+import BudgetProgressBar from '../components/BudgetProgressBar.vue';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 
 const router = useRouter();
 
@@ -16,6 +18,10 @@ Chart.register(...registerables);
 const dashboard = ref(null);
 const budgets = ref([]);
 const loading = ref(true);
+const userSettings = ref({
+  dashboard_show_budget: true,
+  dashboard_budget_expanded: false
+});
 
 const {
   filterType,
@@ -40,15 +46,24 @@ const loadDashboard = async () => {
     dashboard.value = data;
     const bRes = await api.getBudgets();
     budgets.value = bRes;
-    nextTick(updateNetChart);
+    
+    // Get user preferences
+    const me = await api.getMe();
+    if (me && me.user) {
+      userSettings.value.dashboard_show_budget = me.user.dashboard_show_budget !== false;
+      userSettings.value.dashboard_budget_expanded = !!me.user.dashboard_budget_expanded;
+      isBudgetsCollapsed.value = !userSettings.value.dashboard_budget_expanded;
+    }
+
   } catch (err) {
     console.error(err);
   } finally {
     loading.value = false;
+    scheduleNetChart();
   }
 };
 
-const isBudgetsCollapsed = ref(false);
+const isBudgetsCollapsed = ref(true);
 const goToBudgetDetail = (id) => {
   router.push({ path: '/budgets', query: { openDetail: id } });
 };
@@ -122,47 +137,57 @@ const netTrendData = computed(() => {
 });
 
 const updateNetChart = () => {
-  if (netLineChartCanvas.value) {
-    if (netChartInstance) {
-      netChartInstance.destroy();
-    }
-    
-    const isPositive = filteredNet.value >= 0;
-    const lineColor = isPositive ? '#34d399' : '#fb7185';
-    const fillColor = isPositive ? 'rgba(52, 211, 153, 0.08)' : 'rgba(251, 113, 133, 0.08)';
+  const canvas = netLineChartCanvas.value;
+  if (!canvas) return;
 
-    netChartInstance = new Chart(netLineChartCanvas.value, {
-      type: 'line',
-      data: {
-        labels: netTrendData.value.map((_, i) => i),
-        datasets: [{
-          data: netTrendData.value,
-          borderColor: lineColor,
-          borderWidth: 1.8,
-          pointRadius: 0,
-          tension: 0.4,
-          fill: true,
-          backgroundColor: fillColor
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false }
-        },
-        scales: {
-          x: { display: false },
-          y: { display: false }
-        }
-      }
-    });
+  if (netChartInstance) {
+    netChartInstance.destroy();
+    netChartInstance = null;
   }
+
+  const isPositive = filteredNet.value >= 0;
+  const lineColor = isPositive ? '#34d399' : '#fb7185';
+  const fillColor = isPositive ? 'rgba(52, 211, 153, 0.18)' : 'rgba(251, 113, 133, 0.18)';
+
+  netChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: netTrendData.value.map((_, i) => i),
+      datasets: [{
+        data: netTrendData.value,
+        borderColor: lineColor,
+        borderWidth: 1.8,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true,
+        backgroundColor: fillColor
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: {
+        x: { display: false },
+        y: { display: false }
+      }
+    }
+  });
+};
+
+const scheduleNetChart = () => {
+  nextTick(() => {
+    requestAnimationFrame(updateNetChart);
+  });
 };
 
 watch([netTrendData, filteredNet], () => {
-  nextTick(updateNetChart);
+  if (loading.value) return;
+  scheduleNetChart();
 });
 
 const openFilterModal = () => {
@@ -189,37 +214,9 @@ const viewTransaction = (transaction) => {
   }));
 };
 
-const groupedTransactions = computed(() => {
-  if (filteredTransactions.value.length === 0) return [];
+const groupedTransactions = computed(() => groupTransactionsByDate(filteredTransactions.value));
 
-  const groups = {};
-  filteredTransactions.value.forEach(t => {
-    const dateStr = t.date ? t.date.split('T')[0] : 'Unknown';
-    if (!groups[dateStr]) {
-      groups[dateStr] = {
-        date: dateStr,
-        transactions: []
-      };
-    }
-    groups[dateStr].transactions.push(t);
-  });
-
-  return Object.values(groups).sort((a, b) => b.date.localeCompare(a.date));
-});
-
-const getGroupTotals = (transactions) => {
-  let income = 0;
-  let expense = 0;
-  transactions.forEach(t => {
-    const amt = parseFloat(t.amount || 0);
-    if (t.type_name === 'Income') {
-      income += amt;
-    } else if (t.type_name === 'Expense') {
-      expense += amt;
-    }
-  });
-  return { income, expense };
-};
+const getGroupTotals = (transactions) => calculateGroupTotals(transactions);
 
 const collapsedGroups = ref({});
 const toggleGroup = (dateStr) => {
@@ -258,26 +255,7 @@ const confirmDelete = async () => {
   }
 };
 
-const formatGroupDateLabel = (dateStr) => {
-  if (dateStr === 'Unknown') return 'Tidak Diketahui';
-  const d = new Date(dateStr);
-  const dateFormatted = `${d.getDate()}/${d.getMonth() + 1}`;
-  
-  const getLocalStr = (dateObj) => {
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const db = String(dateObj.getDate()).padStart(2, '0');
-    return `${y}-${m}-${db}`;
-  };
-  const today = getLocalStr(new Date());
-  const yesterday = getLocalStr(new Date(Date.now() - 86400000));
-
-  const dayName = d.toLocaleDateString('id-ID', { weekday: 'long' });
-
-  if (dateStr === today) return `Hari Ini — ${dateFormatted}`;
-  if (dateStr === yesterday) return `Kemarin — ${dateFormatted}`;
-  return `${dayName}, ${dateFormatted}`;
-};
+const formatGroupDateLabel = (dateStr) => formatGroupDate(dateStr);
 
 const dashboardBudgets = computed(() => {
   return budgets.value
@@ -288,6 +266,10 @@ const dashboardBudgets = computed(() => {
 const getProgressColorClass = (percent) => {
   if (percent >= 100) return 'bg-rose-500';
   if (percent >= 80) return 'bg-amber-500';
+  if (netChartInstance) {
+    netChartInstance.destroy();
+    netChartInstance = null;
+  }
   return 'bg-emerald-500';
 };
 
@@ -370,7 +352,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Budget Widget -->
-      <div v-if="dashboardBudgets.length > 0" class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md space-y-3">
+      <div v-if="userSettings.dashboard_show_budget && dashboardBudgets.length > 0" class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md space-y-3">
         <div class="flex items-center justify-between">
           <h4 @click="isBudgetsCollapsed = !isBudgetsCollapsed" class="text-[10px] font-black text-accent uppercase tracking-wider flex items-center gap-1.5 cursor-pointer select-none">
             <PhPiggyBank :size="12" /> Anggaran Aktif
@@ -389,26 +371,13 @@ onUnmounted(() => {
                 <span class="font-bold text-slate-700 truncate text-[11px]">{{ b.name }}</span>
               </div>
             </div>
-            <div class="w-full h-8 rounded-full overflow-hidden bg-slate-100 relative shadow-inner">
-              <!-- Background text -->
-              <div class="absolute inset-0 flex items-center justify-between px-3 text-[10px] font-bold text-slate-500 select-none pointer-events-none">
-                <span>Limit: {{ formatRp(b.limit_amount) }}</span>
-                <span>{{ Math.round(b.percentage_used) }}%</span>
-                <span>Sisa: {{ formatRp(Math.max(0, b.limit_amount - b.spent_amount)) }}</span>
-              </div>
-
-              <!-- Progress Fill -->
-              <div class="h-full rounded-full transition-all duration-500 bg-accent relative overflow-hidden"
-                :style="{ width: Math.min(100, b.percentage_used) + '%' }">
-                <!-- Foreground text -->
-                <div class="absolute top-0 bottom-0 left-0 flex items-center justify-between px-3 text-[10px] font-bold text-white select-none pointer-events-none"
-                  :style="{ width: (100 / Math.max(1, Math.min(100, b.percentage_used))) * 100 + '%' }">
-                  <span>Limit: {{ formatRp(b.limit_amount) }}</span>
-                  <span>{{ Math.round(b.percentage_used) }}%</span>
-                  <span>Sisa: {{ formatRp(Math.max(0, b.limit_amount - b.spent_amount)) }}</span>
-                </div>
-              </div>
-            </div>
+            <BudgetProgressBar
+              variant="detailed"
+              rounded="full"
+              :limit-amount="b.limit_amount"
+              :spent-amount="b.spent_amount"
+              :percentage-used="b.percentage_used"
+            />
           </div>
         </div>
       </div>
@@ -463,29 +432,16 @@ onUnmounted(() => {
 
     </template>
 
-    <!-- Teleport Delete Confirmation Modal -->
-    <Teleport to="body">
-      <div v-if="showDeleteConfirm"
-        class="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-        <div class="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-4 text-center">
-          <div class=" p-4 rounded-full inline-flex">
-            <PhWarning :size="52" color="#ec2727" />
-          </div>
-          <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Konfirmasi Hapus</h3>
-          <p class="text-xs text-slate-500 font-semibold leading-relaxed">Apakah Anda yakin ingin menghapus transaksi ini?</p>
-          <div class="flex gap-2.5 pt-1">
-            <button @click="showDeleteConfirm = false; transactionToDelete = null"
-              class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200">
-              Batal
-            </button>
-            <button @click="confirmDelete"
-              class="flex-1 py-2 bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-500/25">
-              Ya, Hapus
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Delete Confirmation Modal -->
+    <ConfirmDeleteModal
+      v-model:show="showDeleteConfirm"
+      title="Konfirmasi Hapus"
+      message="Apakah Anda yakin ingin menghapus transaksi ini?"
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false; transactionToDelete = null"
+    />
 
     <!-- Modular Date Filter Modal -->
     <DateFilter

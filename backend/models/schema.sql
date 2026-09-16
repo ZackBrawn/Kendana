@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS wallets (
     group_type VARCHAR(50) DEFAULT 'Liquid',
     icon VARCHAR(10) DEFAULT '💵',
     keyword TEXT,
-    is_pinned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -73,3 +72,4 @@ CREATE TABLE IF NOT EXISTS net_worth_snapshots (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, snapshot_date)
 );
+

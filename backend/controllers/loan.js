@@ -29,3 +29,25 @@ exports.getLoans = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.getSubjects = async (req, res) => {
+  const { type } = req.params; // 'debt' or 'receivable'
+  const typeName = type === 'debt' ? 'Debt' : 'Receivable';
+  try {
+    const subjects = await prisma.transactionLog.findMany({
+      where: {
+        user_id: req.user.id,
+        type: { name: typeName },
+        subject: { not: '-' }
+      },
+      select: {
+        subject: true
+      },
+      distinct: ['subject']
+    });
+
+    res.json(subjects.map(s => s.subject));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

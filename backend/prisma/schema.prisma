@@ -12,15 +12,75 @@ model User {
   email                  String   @unique
   password               String
   allow_negative_balance Boolean  @default(false)
-  created_at             DateTime @default(now())
+  whatsapp               String?
+  telegram               String?
+  avatar                 String?
+  google_id              String?
+  timezone               String   @default("Asia/Jakarta")
+  date_format            String   @default("DD/MM/YYYY")
+  locale                 String   @default("id")
+  accent_color           String   @default("indigo")
+  theme                  String   @default("dark")
+  category_icon_colored  Boolean  @default(true)
+  bot_name               String   @default("ZackBrawn")
+  bot_avatar             String?
+  bot_display_name       String?
+  auto_budget_enabled       Boolean  @default(false)
+  email_notifications       Boolean  @default(true)
+  push_notifications        Boolean  @default(true)
+  dashboard_show_budget     Boolean  @default(true)
+  dashboard_budget_expanded Boolean  @default(false)
+  created_at                DateTime @default(now())
 
   wallets             Wallet[]
   categories          Category[]
   transaction_logs    TransactionLog[]
   net_worth_snapshots NetWorthSnapshot[]
   budgets             Budget[]
+  settings_changes    UserSettingsChange[]
+  budget_groups              BudgetGroup[]
+  budget_generation_statuses BudgetGenerationStatus[]
+  evidence                   Evidence[]
+  push_subscriptions         PushSubscription[]
+  conversations              Conversation[]
+  transaction_drafts         TransactionDraft[]
+  custom_notifications       CustomNotification[]
 
   @@map("users")
+}
+
+model CustomNotification {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  title        String
+  body         String
+  scheduled_at DateTime
+  frequency    String   @default("once")
+  active       Boolean  @default(true)
+  is_test      Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([active, scheduled_at])
+  @@index([user_id, active])
+  @@map("custom_notifications")
+}
+
+model UserSettingsChange {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  setting_key  String?
+  setting_page String?
+  old_value    String?  @db.Text
+  new_value    String?  @db.Text
+  changed_at   DateTime @default(now())
+
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, changed_at])
+  @@map("user_settings_changes")
 }
 
 model TransactionType {
@@ -40,7 +100,6 @@ model Wallet {
   group_type String   @default("Liquid")
   icon       String   @default("💵")
   keyword    String?
-  is_pinned  Boolean  @default(false)
   created_at DateTime @default(now())
 
   user        User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -58,6 +117,7 @@ model Category {
   category_name String
   icon          String   @default("📁")
   keyword       String?
+  system_key    String?
   created_at    DateTime @default(now())
 
   user             User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -83,6 +143,7 @@ model TransactionLog {
   subject               String?
   notes                 String?
   is_cleared            Boolean  @default(true)
+  client_id             String?  @unique
   created_at            DateTime @default(now())
 
   user               User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -90,6 +151,7 @@ model TransactionLog {
   category           Category?       @relation(fields: [category_id], references: [id], onDelete: SetNull)
   source_wallet      Wallet          @relation("SourceWallet", fields: [source_wallet_id], references: [id])
   destination_wallet Wallet          @relation("DestWallet", fields: [destination_wallet_id], references: [id])
+  evidence           Evidence[]      @relation("EvidenceTransaction")
 
   @@map("transaction_logs")
 }
@@ -147,4 +209,213 @@ model BudgetCategory {
 
   @@id([budget_id, category_id])
   @@map("budget_categories")
+}
+
+model BudgetGroup {
+  id                   Int                  @id @default(autoincrement())
+  user_id              Int
+  period_month         Int
+  period_year          Int
+  total_budget_amount  Decimal              @db.Decimal(15, 2)
+  ai_notes             String?
+  generated_by         String               // 'ai' or 'manual'
+  over_alert_sent_at   DateTime?
+  name                 String?
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+
+  user                 User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  items                BudgetItem[]
+  expenseGroups        BudgetExpenseGroup[]
+
+  @@unique([user_id, period_month, period_year])
+  @@map("budget_groups")
+}
+
+model BudgetItem {
+  id              Int         @id @default(autoincrement())
+  budget_group_id Int
+  budgetable_type String
+  budgetable_id   Int
+  target_amount   Decimal     @db.Decimal(15, 2)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  budget_group    BudgetGroup @relation(fields: [budget_group_id], references: [id], onDelete: Cascade)
+
+  @@map("budget_items")
+}
+
+model BudgetExpenseGroup {
+  id              Int         @id @default(autoincrement())
+  budget_group_id Int
+  group_key       String
+  group_name      String
+  category_ids    Json
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  budget_group    BudgetGroup @relation(fields: [budget_group_id], references: [id], onDelete: Cascade)
+
+  @@map("budget_expense_groups")
+}
+
+model BudgetGenerationStatus {
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  year          Int
+  month         Int
+  status        String   @default("pending") // 'pending' | 'processing' | 'success' | 'failed'
+  error_message String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, year, month])
+  @@map("budget_generation_statuses")
+}
+
+model Evidence {
+  id                     Int                    @id @default(autoincrement())
+  uuid                   String                 @unique @default(uuid())
+  user_id                Int
+  original_name          String
+  stored_name            String
+  mime_type              String
+  extension              String
+  size                   Int
+  disk                   String
+  path                   String
+  status                 String                 @default("UPLOADED")
+  source                 String                 @default("CHAT_UPLOAD")
+  processing_started_at  DateTime?
+  processing_finished_at DateTime?
+  error_message          String?
+  retry_count            Int                    @default(0)
+  last_processed_at      DateTime?
+  ocr_text               String?
+  normalized_text        String?
+  normalization_duration_ms Int?
+  normalization_changes  Int?
+  ocr_engine             String?
+  ocr_duration_ms        Int?
+  ocr_version            String?
+  document_type          String?
+  classifier_engine      String?
+  classifier_version     String?
+  classifier_confidence  Float?
+  parsed_data            Json?
+  parser_engine          String?
+  parser_version         String?
+  parser_confidence      Float?
+  resolved_data          Json?
+  resolver_engine        String?
+  resolver_version       String?
+  resolver_confidence    Float?
+  resolver_warnings      Json?
+  transaction_id         Int?
+  completed_at           DateTime?
+  commit_version         String?
+  created_at             DateTime               @default(now())
+  updated_at             DateTime               @updatedAt
+
+  user                   User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  transaction            TransactionLog?        @relation("EvidenceTransaction", fields: [transaction_id], references: [id], onDelete: SetNull)
+  processing_logs        EvidenceProcessingLog[]
+
+  @@map("evidence")
+}
+
+model EvidenceProcessingLog {
+  id            Int      @id @default(autoincrement())
+  evidence_id   Int
+  stage         String
+  status_before String?
+  status_after  String
+  duration_ms   Int?
+  message       String?
+  metadata      Json?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  evidence      Evidence @relation(fields: [evidence_id], references: [id], onDelete: Cascade)
+
+  @@map("evidence_processing_logs")
+}
+
+model PushSubscription {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  user_agent String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("push_subscriptions")
+}
+
+model Conversation {
+  id         Int           @id @default(autoincrement())
+  user_id    Int
+  title      String?
+  is_active  Boolean       @default(true)
+  archived_at DateTime?
+  metadata   Json?
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages   ChatMessage[]
+  drafts     TransactionDraft[]
+
+  @@index([user_id, is_active, archived_at])
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id              Int          @id @default(autoincrement())
+  conversation_id Int
+  role            String       @db.VarChar(20) // 'user' | 'assistant'
+  status          String       @default("completed") // 'pending' | 'processing' | 'completed' | 'failed'
+  error_message   String?
+  content         Json         // JSON array of ChatComponent objects
+  raw_text        String?      @db.Text
+  metadata        Json?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@map("chat_messages")
+}
+
+model TransactionDraft {
+  id                         Int          @id @default(autoincrement())
+  user_id                    Int
+  conversation_id            Int?
+  ai_provider                String?      @db.VarChar(50)
+  ai_model                   String?      @db.VarChar(100)
+  draft_type                 String       @default("single") @db.VarChar(20)
+  payload                    Json
+  status                     String       @default("pending") @db.VarChar(20) // 'pending' | 'confirmed' | 'cancelled' | 'expired'
+  confirmed_transaction_ids  Json?
+  expires_at                 DateTime?
+  ai_confidence              Decimal?     @db.Decimal(4, 3)
+  original_text              String?      @db.Text
+  created_at                 DateTime     @default(now())
+  updated_at                 DateTime     @updatedAt
+
+  user                       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversation               Conversation? @relation(fields: [conversation_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, status, expires_at])
+  @@index([conversation_id, status])
+  @@index([expires_at])
+  @@map("transaction_drafts")
 }

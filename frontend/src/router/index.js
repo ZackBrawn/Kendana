@@ -1,13 +1,24 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import Dashboard from '../views/Dashboard.vue';
+import Wallets from '../views/Wallets.vue';
+import Other from '../views/Other.vue';
+import Notifications from '../views/Notifications.vue';
+import Budgets from '../views/Budgets.vue';
+import Analytics from '../views/Analytics.vue';
+import Loans from '../views/Loans.vue';
+import Chat from '../views/Chat.vue';
+import Auth from '../views/Auth.vue';
 
 const routes = [
-  { path: '/', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
-  { path: '/wallets', name: 'Wallets', component: () => import('../views/Wallets.vue') },
-  { path: '/other', name: 'Other', component: () => import('../views/Other.vue') },
-  { path: '/budgets', name: 'Budgets', component: () => import('../views/Budgets.vue') },
-  { path: '/analytics', name: 'Analytics', component: () => import('../views/Analytics.vue') },
-  { path: '/loans', name: 'Loans', component: () => import('../views/Loans.vue') },
-  { path: '/login', name: 'Auth', component: () => import('../views/Auth.vue') }
+  { path: '/', name: 'Dashboard', component: Dashboard },
+  { path: '/wallets', name: 'Wallets', component: Wallets },
+  { path: '/other', name: 'Other', component: Other },
+  { path: '/other/notifikasi', name: 'Notifications', component: Notifications },
+  { path: '/budgets', name: 'Budgets', component: Budgets },
+  { path: '/analytics', name: 'Analytics', component: Analytics },
+  { path: '/loans', name: 'Loans', component: Loans },
+  { path: '/chat', name: 'Chat', component: Chat },
+  { path: '/login', name: 'Auth', component: Auth }
 ];
 
 const router = createRouter({

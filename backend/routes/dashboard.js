@@ -6,3 +6,4 @@ const { authenticateToken } = require('../middlewares/auth');
 router.get('/', authenticateToken, dashboard.getDashboard);
 
 module.exports = router;
+

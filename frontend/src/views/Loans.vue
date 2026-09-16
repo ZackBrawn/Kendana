@@ -55,3 +55,4 @@ onMounted(loadLoans);
     </div>
   </div>
 </template>
+

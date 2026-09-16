@@ -1,11 +1,12 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted, watch, nextTick } from 'vue';
 import { api, showToast } from '../api';
-import { PhArrowLeft, PhWarning, PhCaretDown, PhEye, PhEyeSlash } from "@phosphor-icons/vue";
+import { PhArrowLeft, PhWarning, PhCaretDown, PhEye, PhEyeSlash, PhPencilSimple } from "@phosphor-icons/vue";
 import { WALLET_ICONS } from '../utils/iconList';
 import { Chart, registerables } from 'chart.js';
-import { formatRp, resolveIcon } from '../utils/helpers';
+import { formatRp, resolveIcon, groupTransactionsByDate, formatGroupDate } from '../utils/helpers';
 import Transaction from '../components/Transaction.vue';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 
 Chart.register(...registerables);
 
@@ -133,6 +134,14 @@ const handleUpdateWallet = async () => {
     });
     showToast('Dompet berhasil diperbarui', 'success');
     showEditWalletSheet.value = false;
+
+    // update details if currently open
+    if (selectedWallet.value && selectedWallet.value.id === editingWallet.value.id) {
+      selectedWallet.value.name = editWalletName.value.trim();
+      selectedWallet.value.balance = parseFloat(editWalletBalance.value || 0);
+      selectedWallet.value.icon = editWalletIcon.value;
+    }
+
     editingWallet.value = null;
     loadWallets();
   } catch (err) {
@@ -148,12 +157,67 @@ const handleDeleteWallet = async () => {
     await api.deleteWallet(editingWallet.value.id);
     showToast('Dompet berhasil dihapus', 'success');
     showEditWalletSheet.value = false;
+
+    // close details page if current wallet was deleted
+    if (selectedWallet.value && selectedWallet.value.id === editingWallet.value.id) {
+      showDetailModal.value = false;
+      selectedWallet.value = null;
+    }
+
     editingWallet.value = null;
     loadWallets();
   } catch (err) {
     showToast(err.message, 'error');
   }
 };
+
+// format wallet balance input values
+const balanceDisplay = computed({
+  get() {
+    if (balance.value === undefined || balance.value === null || balance.value === '') return '';
+    if (balance.value === '-') return '-';
+    const isNegative = balance.value.toString().startsWith('-');
+    const cleanNum = balance.value.toString().replace(/-/g, '');
+    const formatted = cleanNum.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return isNegative ? '-' + formatted : formatted;
+  },
+  set(val) {
+    const clean = val.replace(/\./g, '').replace(/[^0-9-]/g, '');
+    let cleaned = clean;
+    if (cleaned.startsWith('-')) {
+      cleaned = '-' + cleaned.slice(1).replace(/-/g, '');
+    } else {
+      cleaned = cleaned.replace(/-/g, '');
+    }
+    const sign = cleaned.startsWith('-') ? '-' : '';
+    const digits = cleaned.replace(/-/g, '').slice(0, 12);
+    balance.value = sign + digits;
+  }
+});
+
+// format edit wallet balance input values
+const editWalletBalanceDisplay = computed({
+  get() {
+    if (editWalletBalance.value === undefined || editWalletBalance.value === null || editWalletBalance.value === '') return '';
+    if (editWalletBalance.value === '-') return '-';
+    const isNegative = editWalletBalance.value.toString().startsWith('-');
+    const cleanNum = editWalletBalance.value.toString().replace(/-/g, '');
+    const formatted = cleanNum.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return isNegative ? '-' + formatted : formatted;
+  },
+  set(val) {
+    const clean = val.replace(/\./g, '').replace(/[^0-9-]/g, '');
+    let cleaned = clean;
+    if (cleaned.startsWith('-')) {
+      cleaned = '-' + cleaned.slice(1).replace(/-/g, '');
+    } else {
+      cleaned = cleaned.replace(/-/g, '');
+    }
+    const sign = cleaned.startsWith('-') ? '-' : '';
+    const digits = cleaned.replace(/-/g, '').slice(0, 12);
+    editWalletBalance.value = sign + digits;
+  }
+});
 
 const liquidWallets = computed(() => {
   return wallets.value.filter(w => w.group_type !== 'System');
@@ -274,20 +338,30 @@ const showDetailModal = ref(false);
 const detailTab = ref('summary'); // summary / history
 const walletTransactions = ref([]);
 const loadingTransactions = ref(false);
+const pagination = ref({ page: 1, pages: 1 });
 
-const openWalletDetails = async (wallet) => {
+const openWalletDetails = async (wallet, page = 1) => {
   selectedWallet.value = wallet;
   showDetailModal.value = true;
   loadingTransactions.value = true;
   try {
-    const allTx = await api.getTransactions();
-    walletTransactions.value = allTx.filter(t =>
-      t.source_wallet_id === wallet.id || t.destination_wallet_id === wallet.id
-    );
+    const res = await api.getWalletDetail(wallet.id, { page });
+    if (page === 1) {
+      walletTransactions.value = res.transactions;
+    } else {
+      walletTransactions.value = [...walletTransactions.value, ...res.transactions];
+    }
+    pagination.value = res.pagination;
   } catch (err) {
-    showToast(err.message, 'error');
+    showToast(err.message || 'Gagal memuat detail dompet', 'error');
   } finally {
     loadingTransactions.value = false;
+  }
+};
+
+const loadMoreTransactions = () => {
+  if (pagination.value.page < pagination.value.pages) {
+    openWalletDetails(selectedWallet.value, pagination.value.page + 1);
   }
 };
 
@@ -319,40 +393,9 @@ const categoryExpenseBreakdown = computed(() => {
   return Object.values(breakdown).sort((a, b) => b.amount - a.amount);
 });
 
-const walletGroupedTransactions = computed(() => {
-  const groups = {};
-  walletTransactions.value.forEach(t => {
-    const dateStr = t.date ? t.date.split('T')[0] : 'Unknown';
-    if (!groups[dateStr]) {
-      groups[dateStr] = {
-        date: dateStr,
-        transactions: []
-      };
-    }
-    groups[dateStr].transactions.push(t);
-  });
-  return Object.values(groups).sort((a, b) => b.date.localeCompare(a.date));
-});
+const walletGroupedTransactions = computed(() => groupTransactionsByDate(walletTransactions.value));
 
-const formatGroupDateLabel = (dateStr) => {
-  if (dateStr === 'Unknown' || !dateStr) return 'Tidak Diketahui';
-  const d = new Date(dateStr);
-  const getLocalStr = (dateObj) => {
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const db = String(dateObj.getDate()).padStart(2, '0');
-    return `${y}-${m}-${db}`;
-  };
-  const today = getLocalStr(new Date());
-  const yesterday = getLocalStr(new Date(Date.now() - 86400000));
-
-  const dayName = d.toLocaleDateString('id-ID', { weekday: 'long' });
-  const dateFormatted = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-
-  if (dateStr === today) return `Hari Ini — ${dateFormatted}`;
-  if (dateStr === yesterday) return `Kemarin — ${dateFormatted}`;
-  return `${dayName}, ${dateFormatted}`;
-};
+const formatGroupDateLabel = (dateStr) => formatGroupDate(dateStr);
 
 const collapsedGroups = ref({});
 const toggleGroup = (dateStr) => {
@@ -427,7 +470,7 @@ onUnmounted(() => {
     <div class="flex items-center justify-between">
       <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Aset & Dompet</h2>
       <button @click="showAddModal = true"
-        class="px-3 py-1.5 bg-accent bg-accent-hover text-white rounded-xl text-xs font-bold shadow-xs">
+        class="px-3 py-1.5 bg-accent text-white rounded-xl text-xs font-bold shadow-xs">
         + Tambah Dompet
       </button>
     </div>
@@ -490,20 +533,19 @@ onUnmounted(() => {
     <div class="flex-1 min-h-0">
       <div v-if="activeWalletTab === 'list'" class="space-y-2">
         <div v-for="w in liquidWallets" :key="w.id" @click="openWalletDetails(w)"
-          class="bg-white rounded-2xl p-2.5 flex items-center justify-between shadow-md cursor-pointer hover:bg-slate-50/50 transition-colors animate-in fade-in duration-150">
-          <div class="flex items-center gap-3 flex-1 min-w-0">
+          class="bg-white rounded-2xl p-2 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-50/50 transition-colors animate-in fade-in duration-150">
+          <div class="flex items-center gap-2 flex-1 min-w-0">
             <div
-              class="w-12 h-12 rounded-xl bg-accent-light flex items-center justify-center text-xl shrink-0 text-accent">
-              <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="34" />
+              class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 text-accent">
+              <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="24" />
               <span v-else>{{ w.icon }}</span>
             </div>
             <div class="min-w-0">
-              <h3 class="text-xs font-bold text-slate-900 truncate">{{ w.name }}</h3>
-              <span class="text-[9px] font-bold text-accent bg-accent-light px-2 py-0.5 rounded-md">{{ w.group_type
-              }}</span>
+              <h3 class="text-[11px] font-bold text-slate-900 truncate">{{ w.name }}</h3>
+              <span class="text-[8px] font-bold text-accent bg-accent-light px-1.5 py-0.5 rounded-md">{{ w.group_type }}</span>
             </div>
           </div>
-          <p class="text-sm font-black text-slate-900 shrink-0 pl-2">
+          <p class="text-xs font-black text-slate-900 shrink-0 pl-2">
             {{ hideValues ? 'Rp ***' : formatRp(w.balance) }}
           </p>
         </div>
@@ -512,17 +554,17 @@ onUnmounted(() => {
       <TransitionGroup name="list" tag="div" v-else class="space-y-2">
         <div v-for="(w, idx) in liquidWallets" :key="w.id" draggable="true" @dragstart="dragStartWallet(idx)"
           @dragover.prevent="dragOverWallet(idx, $event)" @dragend="dragEndWallet" @click="openEditWallet(w)"
-          class="bg-white rounded-2xl p-2.5 flex items-center justify-between shadow-md cursor-pointer hover:bg-slate-50/50 transition-colors"
+          class="bg-white rounded-2xl p-2 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-50/50 transition-colors"
           :class="draggedWalletIdx === idx ? 'opacity-40 scale-[0.98] border-accent/40 bg-accent-light' : 'border-transparent hover:border-accent/40'">
-          <div class="flex items-center gap-3 flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-1 min-w-0">
             <div
-              class="w-12 h-12 rounded-xl bg-accent-light flex items-center justify-center text-xl shrink-0 text-accent">
-              <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="34" />
+              class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 text-accent">
+              <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="24" />
               <span v-else>{{ w.icon }}</span>
             </div>
             <div class="min-w-0">
-              <h3 class="text-xs font-bold text-slate-900 truncate">{{ w.name }}</h3>
-              <span class="text-[9px] font-bold text-accent bg-accent-light px-2 py-0.5 rounded-md">{{ w.group_type
+              <h3 class="text-[11px] font-bold text-slate-900 truncate">{{ w.name }}</h3>
+              <span class="text-[8px] font-bold text-accent bg-accent-light px-1.5 py-0.5 rounded-md">{{ w.group_type
               }}</span>
             </div>
           </div>
@@ -557,7 +599,7 @@ onUnmounted(() => {
 
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Saldo Awal</label>
-            <input v-model="balance" type="number" placeholder="0"
+            <input v-model="balanceDisplay" type="text" placeholder="0"
               class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
           </div>
 
@@ -579,7 +621,7 @@ onUnmounted(() => {
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
           <button @click="handleCreate"
-            class="w-full py-3 bg-accent bg-accent-hover text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 cursor-pointer">
+            class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 cursor-pointer">
             Simpan Dompet
           </button>
         </div>
@@ -597,7 +639,11 @@ onUnmounted(() => {
             <PhArrowLeft :size="24" weight="bold"/>
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Detail Dompet</h3>
-          <div class="w-12"></div>
+          <button @click="openEditWallet(selectedWallet)"
+            class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer"
+            title="Edit Dompet">
+            <PhPencilSimple :size="24" weight="bold"/>
+          </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-20">
@@ -726,6 +772,13 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
+              
+              <div v-if="pagination.page < pagination.pages" class="pt-2 flex justify-center">
+                <button @click="loadMoreTransactions" 
+                  class="px-4 py-2 text-center text-[10px] font-black uppercase bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl cursor-pointer">
+                  Muat Lebih Banyak
+                </button>
+              </div>
             </div>
           </template>
         </div>
@@ -733,28 +786,15 @@ onUnmounted(() => {
     </Teleport>
 
     <!-- Delete Confirm Modal -->
-    <Teleport to="body">
-      <div v-if="showDeleteConfirm"
-        class="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-        <div class="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-4 text-center">
-          <div class=" p-4 rounded-full inline-flex">
-            <PhWarning :size="52" color="#ec2727" />
-          </div>
-          <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Konfirmasi Hapus</h3>
-          <p class="text-xs text-slate-500 font-semibold leading-relaxed">Apakah Anda yakin ingin menghapus transaksi ini?</p>
-          <div class="flex gap-2.5 pt-1">
-            <button @click="showDeleteConfirm = false; transactionToDelete = null"
-              class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200 cursor-pointer">
-              Batal
-            </button>
-            <button @click="confirmDelete"
-              class="flex-1 py-2 bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-500/25 cursor-pointer">
-              Ya, Hapus
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ConfirmDeleteModal
+      v-model:show="showDeleteConfirm"
+      title="Konfirmasi Hapus"
+      message="Apakah Anda yakin ingin menghapus transaksi ini?"
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false; transactionToDelete = null"
+    />
 
     <!-- Edit Wallet Modal Sheet -->
     <Teleport to="body">
@@ -780,9 +820,10 @@ onUnmounted(() => {
 
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Saldo</label>
-            <input v-model="editWalletBalance" type="number" placeholder="0"
+            <input v-model="editWalletBalanceDisplay" type="text" placeholder="0"
               class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
           </div>
+
 
           <div class="space-y-1.5 flex-1 flex flex-col min-h-0">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Pilih Icon Dompet</label>
@@ -802,7 +843,7 @@ onUnmounted(() => {
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
           <button @click="handleUpdateWallet"
-            class="w-full py-3 bg-accent bg-accent-hover text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 cursor-pointer">
+            class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 cursor-pointer">
             Simpan Perubahan
           </button>
         </div>

@@ -43,13 +43,14 @@ build/
 Thumbs.db
 
 # local obsidian vault
-docs-vault
-
-# agent configurations
-.agents/
-.codex/
-.impeccable/
+obsidian-vault/
 
 # project documents
 DESIGN.md
 PRODUCT.md
+todo.md
+AGENTS.md
+.github/
+dbdiagram.dbml
+dbdiagram.dbdiagram
+

@@ -1,7 +1,3 @@
-/* 
- * CENTRALIZED GLOBAL THEME SYSTEM (SSOT)
- * Change variables here to customize colors, fonts, sizes, and layout.
- */
 
 :root {
   /* --- TYPOGRAPHY --- */
@@ -112,6 +108,10 @@ body {
 
 /* Centralized Accent Color System Utilities */
 .bg-accent {
+  background-color: var(--color-primary) !important;
+}
+
+.peer:checked ~ .peer-checked\:bg-accent {
   background-color: var(--color-primary) !important;
 }
 

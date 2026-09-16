@@ -18,3 +18,4 @@ module.exports = {
   authenticateToken,
   JWT_SECRET
 };
+

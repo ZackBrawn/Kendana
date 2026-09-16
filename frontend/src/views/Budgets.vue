@@ -1,18 +1,29 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { api, showToast } from '../api';
 import { 
   PhArrowLeft, PhPlus, PhPencil, PhTrash, PhCalendar, PhCheck, PhX, 
   PhWarning, PhFolder, PhTag, PhPiggyBank, PhInfo, PhCaretDown, PhCaretUp,
   PhMagnifyingGlass, PhWallet
 } from "@phosphor-icons/vue";
-import { formatRp, resolveIcon } from '../utils/helpers';
+import { 
+  formatRp, 
+  resolveIcon, 
+  formatThousandNumber, 
+  parseNumberInput, 
+  groupTransactionsByDate, 
+  calculateGroupTotals,
+  formatGroupDate 
+} from '../utils/helpers';
 import { AVAILABLE_ICONS } from '../utils/iconList';
 import Calendar from '../components/Calendar.vue';
 import Transaction from '../components/Transaction.vue';
+import BudgetProgressBar from '../components/BudgetProgressBar.vue';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 
 const route = useRoute();
+const router = useRouter();
 const showPeriodPage = ref(false);
 const showStartDateModal = ref(false);
 const showEndDateModal = ref(false);
@@ -55,12 +66,10 @@ const notifyThresholdPercent = ref(80);
 const notes = ref('');
 const limitAmountDisplay = computed({
   get() {
-    if (limitAmount.value === undefined || limitAmount.value === null || limitAmount.value === '') return '';
-    return limitAmount.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return formatThousandNumber(limitAmount.value);
   },
   set(val) {
-    const clean = val.replace(/\D/g, '').slice(0, 12);
-    limitAmount.value = clean ? parseFloat(clean) : '';
+    limitAmount.value = parseNumberInput(val, 12);
   }
 });
 
@@ -349,53 +358,10 @@ const toggleGroup = (date) => {
 };
 const isCollapsed = (date) => !!collapsedGroups.value[date];
 
-const getGroupTotals = (txs) => {
-  let expense = 0;
-  txs.forEach(t => {
-    const amt = parseFloat(t.amount || 0);
-    if (t.type_name === 'Expense') {
-      expense += amt;
-    }
-  });
-  return { expense };
-};
+const getGroupTotals = (txs) => calculateGroupTotals(txs);
+const formatGroupDateLabel = (dateStr) => formatGroupDate(dateStr);
 
-const formatGroupDateLabel = (dateStr) => {
-  const d = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  if (d.toDateString() === today.toDateString()) {
-    return 'Hari Ini';
-  } else if (d.toDateString() === yesterday.toDateString()) {
-    return 'Kemarin';
-  }
-
-  const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-  return d.toLocaleDateString('id-ID', options);
-};
-
-const groupedTransactions = computed(() => {
-  if (transactions.value.length === 0) return [];
-
-  const groups = {};
-  transactions.value.forEach(t => {
-    if (!t.date) return;
-    const datePart = t.date.split('T')[0];
-    if (!groups[datePart]) {
-      groups[datePart] = [];
-    }
-    groups[datePart].push(t);
-  });
-
-  return Object.keys(groups)
-    .sort((a, b) => new Date(b) - new Date(a))
-    .map(date => ({
-      date,
-      transactions: groups[date]
-    }));
-});
+const groupedTransactions = computed(() => groupTransactionsByDate(transactions.value));
 
 // Helpers for remaining time
 const getRemainingLabel = (b) => {
@@ -478,18 +444,18 @@ onMounted(async () => {
 <template>
   <div class="space-y-4">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <router-link to="/other" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-          <PhArrowLeft :size="20" weight="bold" />
-        </router-link>
-        <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Anggaran & Budget</h2>
-      </div>
-      <button @click="openCreateModal"
-        class="px-3 py-1.5 bg-accent bg-accent-hover text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer">
-        + Buat Anggaran
+    <div class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
+      <button @click="router.push('/other')" class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
+        <PhArrowLeft :size="24" weight="bold" />
+      </button>
+      <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Anggaran & Budget</h3>
+      <button @click="openCreateModal" class="w-10 h-10 flex items-center justify-center text-accent transition-colors cursor-pointer">
+        <PhPlus :size="22" weight="bold" />
       </button>
     </div>
+
+    <!-- Content -->
+    <div class="px-4 space-y-4">
 
     <!-- Loading Screen -->
     <div v-if="loading" class="animate-pulse space-y-3">
@@ -513,8 +479,8 @@ onMounted(async () => {
       <div v-for="b in budgets" :key="b.id" @click="openBudgetDetails(b.id)"
         class="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-md hover:bg-slate-50/50 transition-all cursor-pointer flex flex-col gap-3 relative overflow-hidden animate-in fade-in duration-200">
         
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-3">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="w-11 h-11 rounded-xl bg-accent-light text-accent flex items-center justify-center text-lg shrink-0">
               <component :is="resolveIcon(b.icon)" v-if="resolveIcon(b.icon)" :size="24" />
               <span v-else>{{ b.icon }}</span>
@@ -526,33 +492,25 @@ onMounted(async () => {
               </p>
             </div>
           </div>
-          <div class="text-right">
-            <span class="text-[10px] font-black text-slate-800 tracking-tight">{{ formatRp(b.spent_amount) }}</span>
-            <span class="text-[9px] text-slate-400 block mt-0.5">dari {{ formatRp(b.limit_amount) }}</span>
+          <div class="text-right shrink-0">
+            <span class="text-[10px] font-black text-slate-800 tracking-tight block">{{ formatRp(b.spent_amount) }}</span>
+            <span class="text-[9px] text-slate-400 font-bold block mt-0.5">/ {{ formatRp(b.limit_amount) }}</span>
           </div>
         </div>
 
         <!-- Progress Bar -->
         <div class="space-y-1">
-          <div class="w-full h-10 rounded-full overflow-hidden bg-slate-100 relative shadow-inner">
-            <!-- Background text (visible when not covered by progress) -->
-            <div class="absolute inset-0 flex items-center justify-between px-3 text-[10px] font-bold text-slate-500 select-none pointer-events-none">
-              <span>Limit: {{ formatRp(b.limit_amount) }}</span>
-              <span>{{ Math.round(b.percentage_used) }}%</span>
-              <span>Sisa: {{ formatRp(Math.max(0, b.limit_amount - b.spent_amount)) }}</span>
-            </div>
-
-            <!-- Progress Fill (Using bg-accent) -->
-            <div class="h-full rounded-full transition-all duration-500 bg-accent relative overflow-hidden"
-              :style="{ width: Math.min(100, b.percentage_used) + '%' }">
-              <!-- Foreground text (visible inside the filled progress bar, clipped) -->
-              <div class="absolute top-0 bottom-0 left-0 flex items-center justify-between px-3 text-[10px] font-bold text-white select-none pointer-events-none"
-                :style="{ width: (100 / Math.max(1, Math.min(100, b.percentage_used))) * 100 + '%' }">
-                <span>Limit: {{ formatRp(b.limit_amount) }}</span>
-                <span>{{ Math.round(b.percentage_used) }}%</span>
-                <span>Sisa: {{ formatRp(Math.max(0, b.limit_amount - b.spent_amount)) }}</span>
-              </div>
-            </div>
+          <BudgetProgressBar
+            variant="compact"
+            rounded="full"
+            :limit-amount="b.limit_amount"
+            :spent-amount="b.spent_amount"
+            :percentage-used="b.percentage_used"
+          />
+          <!-- Limit & Remaining info beneath the bar -->
+          <div class="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-0.5 gap-2">
+            <span class="truncate">Limit: {{ formatRp(b.limit_amount) }}</span>
+            <span class="shrink-0">Sisa: {{ formatRp(Math.max(0, b.limit_amount - b.spent_amount)) }}</span>
           </div>
           <!-- Remaining Cycle Date Info beneath it -->
           <div class="flex items-center justify-end text-[9px] text-slate-400 font-semibold gap-1 pt-0.5">
@@ -618,26 +576,13 @@ onMounted(async () => {
 
             <!-- Progress Info -->
             <div class="space-y-1.5">
-              <div class="w-full h-8 rounded-xl overflow-hidden bg-slate-100 relative shadow-inner">
-                <!-- Background text -->
-                <div class="absolute inset-0 flex items-center justify-between px-3 text-[10px] font-bold text-slate-500 select-none pointer-events-none">
-                  <span>Limit: {{ formatRp(selectedBudget.limit_amount) }}</span>
-                  <span>{{ Math.round(selectedBudget.percentage_used) }}%</span>
-                  <span>Sisa: {{ formatRp(Math.max(0, selectedBudget.limit_amount - selectedBudget.spent_amount)) }}</span>
-                </div>
-
-                <!-- Progress Fill -->
-                <div class="h-full rounded-xl transition-all duration-500 bg-accent relative overflow-hidden"
-                  :style="{ width: Math.min(100, selectedBudget.percentage_used) + '%' }">
-                  <!-- Foreground text -->
-                  <div class="absolute top-0 bottom-0 left-0 flex items-center justify-between px-3 text-[10px] font-bold text-white select-none pointer-events-none"
-                    :style="{ width: (100 / Math.max(1, Math.min(100, selectedBudget.percentage_used))) * 100 + '%' }">
-                    <span>Limit: {{ formatRp(selectedBudget.limit_amount) }}</span>
-                    <span>{{ Math.round(selectedBudget.percentage_used) }}%</span>
-                    <span>Sisa: {{ formatRp(Math.max(0, selectedBudget.limit_amount - selectedBudget.spent_amount)) }}</span>
-                  </div>
-                </div>
-              </div>
+              <BudgetProgressBar
+                variant="detailed"
+                rounded="xl"
+                :limit-amount="selectedBudget.limit_amount"
+                :spent-amount="selectedBudget.spent_amount"
+                :percentage-used="selectedBudget.percentage_used"
+              />
               <div class="flex items-center justify-between text-[9px] font-bold">
                 <span :class="getProgressTextClass(selectedBudget.percentage_used)">{{ selectedBudget.percentage_used.toFixed(1) }}% Terpakai</span>
                 <span class="text-slate-500">{{ getRemainingLabel(selectedBudget) }}</span>
@@ -879,7 +824,7 @@ onMounted(async () => {
             <label class="text-xs font-normal text-slate-600 shrink-0">Budget Permanen Berulang</label>
             <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
               <input type="checkbox" v-model="isPermanent" class="sr-only peer" />
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
             </label>
           </div>
 
@@ -898,7 +843,7 @@ onMounted(async () => {
             <label class="text-xs font-normal text-slate-600 shrink-0">Tampilkan di Dashboard</label>
             <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
               <input type="checkbox" v-model="showOnDashboard" class="sr-only peer" />
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
             </label>
           </div>
 
@@ -907,7 +852,7 @@ onMounted(async () => {
             <label class="text-xs font-normal text-slate-600 shrink-0">Notifikasi Dekat Limit</label>
             <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
               <input type="checkbox" v-model="notifyOnThreshold" class="sr-only peer" />
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
             </label>
           </div>
 
@@ -1041,23 +986,15 @@ onMounted(async () => {
     </Teleport>
 
     <!-- DELETE TRANSACTION CONFIRMATION MODAL -->
-    <Teleport to="body">
-      <div v-if="showDeleteConfirm" class="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-xl border border-slate-100 animate-in zoom-in-95 duration-150">
-          <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-3xs">
-            <PhWarning :size="24" weight="bold" />
-          </div>
-          <div class="space-y-1.5 p-0.5 text-left">
-            <h3 class="text-xs font-bold text-slate-800 tracking-tight">Hapus Transaksi</h3>
-            <p class="text-[10px] text-slate-500 leading-relaxed">Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan.</p>
-          </div>
-          <div class="flex gap-2.5 pt-2">
-            <button @click="showDeleteConfirm = false" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors cursor-pointer text-center">Batal</button>
-            <button @click="confirmDelete" class="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer text-center">Hapus</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
+    <ConfirmDeleteModal
+      v-model:show="showDeleteConfirm"
+      title="Hapus Transaksi"
+      message="Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan."
+      confirm-text="Hapus"
+      cancel-text="Batal"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false; transactionToDelete = null"
+    />
+    </div>
   </div>
 </template>

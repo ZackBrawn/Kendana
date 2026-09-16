@@ -233,8 +233,6 @@ paths:
                   type: string
                 icon:
                   type: string
-                is_pinned:
-                  type: boolean
       responses:
         '200':
           description: Wallet updated successfully
@@ -564,5 +562,3 @@ components:
           type: string
         icon:
           type: string
-        is_pinned:
-          type: boolean
