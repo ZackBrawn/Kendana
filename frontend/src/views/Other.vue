@@ -1,10 +1,11 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { PhTag, PhGear, PhInfo, PhPiggyBank, PhChatCircleDots, PhBell } from "@phosphor-icons/vue";
+import { PhTag, PhGear, PhInfo, PhPiggyBank, PhChatCircleDots, PhBell } from "../utils/icons";
 import Categories from '../components/Categories.vue';
 import Settings from '../components/Settings.vue';
 import About from '../components/About.vue';
+import SketchCard from '../components/SketchCard.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -46,57 +47,63 @@ const closeModal = (hashName) => {
     <!-- Menu Grid Group -->
     <div class="grid grid-cols-3 gap-3">
       <!-- Menu Item: Categories -->
-      <button @click="openModal('categories')"
-        class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
+      <SketchCard @click="openModal('categories')"
+        class="bg-white p-4 hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
         <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
-          <PhTag :size="40" weight="bold" />
+          <PhTag :size="40" />
         </div>
         <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Kategori</span>
-      </button>
+      </SketchCard>
 
       <!-- Menu Item: Budget -->
-      <router-link to="/budgets"
-        class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
-        <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
-          <PhPiggyBank :size="40" weight="bold" />
-        </div>
-        <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Anggaran</span>
+      <router-link to="/budgets">
+        <SketchCard
+          class="bg-white p-4 hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
+          <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
+            <PhPiggyBank :size="40" />
+          </div>
+          <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Anggaran</span>
+        </SketchCard>
       </router-link>
 
       <!-- Menu Item: Settings -->
-      <button @click="openModal('settings')"
-        class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
+      <SketchCard @click="openModal('settings')"
+        class="bg-white p-4 hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
         <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
-          <PhGear :size="40" weight="bold" />
+          <PhGear :size="40" />
         </div>
         <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Pengaturan</span>
-      </button>
+      </SketchCard>
 
       <!-- Menu Item: About -->
-      <button @click="openModal('about')"
-        class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
+      <SketchCard @click="openModal('about')"
+        class="bg-white p-4 hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
         <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
-          <PhInfo :size="40" weight="bold" />
+          <PhInfo :size="40" />
         </div>
         <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Tentang</span>
-      </button>
+      </SketchCard>
 
       <!-- Menu Item: Chat AI -->
-      <router-link to="/chat"
-        class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
-        <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
-          <PhChatCircleDots :size="40" weight="bold" />
-        </div>
-        <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Chat AI</span>
+      <router-link to="/chat">
+        <SketchCard
+          class="bg-white p-4 hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
+          <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
+            <PhChatCircleDots :size="40" />
+          </div>
+          <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Chat AI</span>
+        </SketchCard>
       </router-link>
 
       <!-- Menu Item: Notifications -->
-      <router-link to="/other/notifikasi"
-        class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-md hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
-        <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
-          <PhBell :size="40" weight="bold" />
-        </div>
-        <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Notifikasi</span>
+      <router-link to="/other/notifikasi">
+        <SketchCard
+          class="bg-white p-4 hover:bg-slate-50 active:scale-[0.97] transition-all duration-150 flex flex-col items-center justify-center text-center cursor-pointer gap-2 aspect-square">
+          <div class="w-12 h-12 flex items-center justify-center text-accent shrink-0 shadow-3xs">
+            <PhBell :size="40" />
+          </div>
+          <span class="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-tight">Notifikasi</span>
+        </SketchCard>
       </router-link>
     </div>
 

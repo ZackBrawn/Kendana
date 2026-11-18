@@ -4,7 +4,11 @@ import { api, showToast } from '../api';
 import Keypad from './Keypad.vue';
 import Calendar from './Calendar.vue';
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue';
-import { PhArrowLeft, PhCalendarDots, PhKeyboard, PhTrash, PhFloppyDisk, PhSwap, PhWarning, PhPencil, PhCamera, PhMagicWand } from "@phosphor-icons/vue";
+import { PhArrowLeft, PhCalendarDots, PhKeyboard, PhTrash, PhFloppyDisk, PhSwap, PhWarning, PhPencil, PhCamera, PhMagicWand } from "../utils/icons";
+import SketchTabs from './SketchTabs.vue';
+import SketchInput from './SketchInput.vue';
+import SketchButton from './SketchButton.vue';
+import SketchBox from './SketchBox.vue';
 
 const props = defineProps({
   editTransaction: {
@@ -70,6 +74,13 @@ const TYPE_ITEMS = [
   { id: 4, tab: 'Debt', label: 'Hutang', icon: 'PhHandshake', activeBg: 'bg-accent text-white' },
   { id: 5, tab: 'Receivable', label: 'Piutang', icon: 'PhCoins', activeBg: 'bg-accent text-white' }
 ];
+
+// Daftar tab tipe untuk SketchTabs (ikon di-resolve ke komponen).
+const typeTabs = TYPE_ITEMS.map(item => ({
+  value: item.id,
+  label: item.label,
+  icon: resolveIcon(item.icon)
+}));
 
 const filteredCategories = computed(() => {
   const cats = categories.value.filter(c => c.type_id === typeId.value);
@@ -591,35 +602,27 @@ onMounted(loadOptions);
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex justify-center animate-in fade-in duration-150">
+  <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex justify-center">
     <div
       class="w-full max-w-md bg-white border-x border-slate-200 flex flex-col justify-between h-[100dvh] shadow-2xl relative z-10 overflow-hidden">
 
       <div
-        class="sticky top-5 mb-8 pb-2 z-20 bg-white border-b border-slate-200 px-3.5 py-3 flex items-center justify-between shadow-xs shrink-0 gap-2">
+        class="sticky top-5 mb-8 pb-2 z-20 bg-white border-b border-slate-200 px-3.5 pt-1.5 flex items-center justify-between shadow-xs shrink-0 gap-2">
 
         <div class="w-10 h-10 flex items-center justify-center shrink-0">
           <PhPencil v-if="editTransaction" :size="24" class="text-accent" />
         </div>
 
-        <div class="flex items-center flex-1 py-0.5 overflow-x-auto no-scrollbar flex-nowrap min-w-0">
-          <div class="flex items-center gap-1 mx-auto">
-            <button v-for="item in TYPE_ITEMS" :key="item.id" type="button" @click="handleTypeChange(item.id, item.tab)"
-              :class="[
-                'rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-0 border shadow-2xs h-10 shrink-0',
-                typeId === item.id
-                  ? item.activeBg + ' border-transparent px-2'
-                  : 'text-slate-600 border-none w-9'
-              ]">
-              <component :is="resolveIcon(item.icon)" v-if="resolveIcon(item.icon)" :size="24" />
-              <span v-if="typeId === item.id" class="truncate transition-all duration-200">{{ item.label }}</span>
-            </button>
+        <div class="flex items-center flex-1 py-0.5 min-w-0">
+          <div class="flex items-center mx-auto w-full max-w-[320px]">
+            <SketchTabs class="sketch-tabs--compact" icon-only-inactive :model-value="typeId" :tabs="typeTabs"
+              @update:model-value="id => handleTypeChange(id, TYPE_ITEMS.find(item => item.id === id)?.tab)" />
           </div>
         </div>
 
         <button type="button" @click="$emit('close')"
           class="shrink-0 w-10 h-10 text-accent flex items-center justify-center transition-colors" aria-label="Tutup">
-          <component :is="resolveIcon('PhX')" :size="24" weight="bold" />
+          <component :is="resolveIcon('PhX')" :size="24" />
         </button>
 
       </div>
@@ -627,18 +630,18 @@ onMounted(loadOptions);
       <div
         class="flex-1 pt-3 pb-0 px-0 space-y-3.5 overflow-y-auto no-scrollbar flex flex-col justify-between bg-slate-50">
 
-        <div v-if="errorMsg"
-          class="p-2.5 bg-rose-50 border border-rose-200 text-rose-500 rounded-xl text-xs font-semibold shrink-0 mx-4">
+        <SketchBox v-if="errorMsg"
+          class="p-2.5 bg-rose-50 text-rose-500 text-xs font-semibold shrink-0 mx-4">
           {{ errorMsg }}
-        </div>
+        </SketchBox>
 
         <div v-if="typeId === 3" class="p-4 shadow-xs space-y-3 shrink-0 mx-4">
           <div class="flex items-center justify-between">
             <span class="text-xs font-extrabold text-accent uppercase tracking-wider">Transfer Pindah Saldo</span>
-            <button type="button" @click="swapWallets"
-              class="px-2.5 py-1 bg-accent-light hover:opacity-90 border border-accent/20 text-accent rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+            <SketchButton type="button" @click="swapWallets"
+              class="px-2.5 py-1 bg-accent-light hover:opacity-90 text-accent flex items-center gap-1">
               <PhSwap :size="32" />
-            </button>
+            </SketchButton>
           </div>
 
           <div class="flex items-center gap-2">
@@ -663,7 +666,7 @@ onMounted(loadOptions);
             </button>
 
             <div class="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-slate-900">
-              <component :is="resolveIcon('PhArrowRight')" :size="34" weight="bold" />
+              <component :is="resolveIcon('PhArrowRight')" :size="34" />
             </div>
             <button type="button" @click="openWalletPicker('dest')"
               class="flex-1 p-3 flex flex-col items-center transition-colors relative min-h-[145px]">
@@ -690,38 +693,24 @@ onMounted(loadOptions);
         <div v-else class="flex-1 flex flex-col min-h-0 space-y-2">
 
           <div v-if="typeId !== 4 && typeId !== 5" class="flex justify-center shrink-0">
-            <div
-              class="flex p-0.5 bg-slate-200 border border-slate-200/50 rounded-xl relative w-56 select-none shadow-2xs">
-              <div
-                class="absolute top-0.5 bottom-0.5 left-0.5 bg-white rounded-lg shadow-sm transition-transform duration-250 ease-out w-[calc(50%-2px)]"
-                :class="categoryTab === 'settings' ? 'translate-x-full' : 'translate-x-0'"></div>
-              <button type="button" @click="categoryTab = 'list'"
-                class="flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold transition-colors duration-200 z-10"
-                :class="categoryTab === 'list' ? 'text-accent' : 'text-slate-400'">
-                Kategori
-              </button>
-
-              <button type="button" @click="categoryTab = 'settings'"
-                class="flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold transition-colors duration-200 z-10"
-                :class="categoryTab === 'settings' ? 'text-accent' : 'text-slate-400'">
-                Pengaturan
-              </button>
-            </div>
+            <SketchTabs v-model="categoryTab" class="w-56" :tabs="[
+              { value: 'list', label: 'Kategori' },
+              { value: 'settings', label: 'Pengaturan' }
+            ]" />
           </div>
 
-          <Transition name="fade" mode="out-in">
-            <!-- LIST VIEW -->
-            <div v-if="categoryTab === 'list'" key="list" class="flex-1 flex flex-col min-h-0 space-y-1.5">
-              <div v-if="filteredCategories.length === 0"
-                class="p-4 bg-white rounded-2xl text-center text-xs text-slate-400 border border-slate-200 mx-4">
+          <!-- LIST VIEW -->
+          <div v-if="categoryTab === 'list'" key="list" class="flex-1 flex flex-col min-h-0 space-y-1.5">
+              <SketchBox v-if="filteredCategories.length === 0"
+                class="p-4 bg-white text-center text-xs text-slate-400 mx-4">
                 Belum ada kategori.
-              </div>
+              </SketchBox>
 
               <div v-else class="grid grid-cols-4 gap-2 overflow-y-auto no-scrollbar flex-1 px-4 py-1 content-start">
-                <button v-for="c in filteredCategories" :key="c.id" type="button" @click="categoryId = c.id" :class="[
-                  'p-2.5 rounded-2xl text-center flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-2xs min-h-[68px]',
+                <SketchBox v-for="c in filteredCategories" :key="c.id" @click="categoryId = c.id" :class="[
+                  'p-2.5 text-center flex flex-col items-center justify-center gap-1 transition-all active:scale-95 min-h-[68px]',
                   categoryId === c.id
-                    ? 'bg-accent-light/90 border-accent text-accent ring-2 ring-accent'
+                    ? 'bg-accent-light/90 text-accent ring-2 ring-accent'
                     : 'bg-transparent'
                 ]">
                   <span class="text-xl shrink-0 flex items-center justify-center">
@@ -729,23 +718,23 @@ onMounted(loadOptions);
                     <span v-else>{{ c.icon }}</span>
                   </span>
                   <span class="text-[10px] truncate leading-tight w-full">{{ c.category_name }}</span>
-                </button>
+                </SketchBox>
               </div>
             </div>
 
             <div v-else key="settings" class="flex-1 flex flex-col min-h-0 space-y-1.5">
               <div class="px-4 py-1 shrink-0">
-                <button type="button" @click="showAddCategorySheet = true"
-                  class="w-full py-2.5 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 flex items-center justify-center gap-1.5">
+                <SketchButton type="button" @click="showAddCategorySheet = true"
+                  class="w-full py-2.5 bg-accent text-white uppercase tracking-wider flex items-center justify-center gap-1.5">
                   <span>+ Tambah Kategori Baru</span>
-                </button>
+                </SketchButton>
               </div>
 
-              <TransitionGroup name="list" tag="div" class="flex-1 overflow-y-auto space-y-1.5 px-4 no-scrollbar">
-                <div v-for="(c, idx) in filteredCategories" :key="c.id" draggable="true" @dragstart="dragStart(idx)"
+              <div class="flex-1 overflow-y-auto space-y-1.5 px-4 no-scrollbar">
+                <SketchBox v-for="(c, idx) in filteredCategories" :key="c.id" draggable="true" @dragstart="dragStart(idx)"
                   @dragover.prevent="dragOverItem(idx, $event)" @dragend="dragEnd" @click="openEditCategory(c)" :class="[
-                    'flex items-center justify-between p-2.5 bg-white border border-slate-200/60 rounded-xl shadow-2xs cursor-pointer hover:border-accent/40',
-                    draggedIdx === idx ? 'opacity-40 scale-[0.98] border-accent/40' : ''
+                    'flex items-center justify-between p-2.5 bg-white cursor-pointer',
+                    draggedIdx === idx ? 'opacity-40 scale-[0.98]' : ''
                   ]">
                   <div class="flex items-center gap-2.5 flex-1 min-w-0">
                     <span class="text-base shrink-0 flex items-center justify-center">
@@ -757,21 +746,20 @@ onMounted(loadOptions);
                   </div>
                   <span @click.stop
                     class="text-slate-400 cursor-grab active:cursor-grabbing font-black text-xs select-none p-1.5 hover:text-slate-600 transition-colors">☰</span>
-                </div>
-              </TransitionGroup>
+                </SketchBox>
+              </div>
             </div>
-          </Transition>
         </div>
 
-        <div
-          class="bg-white border-t border-slate-200 rounded-t-3xl p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] space-y-2.5 shrink-0 pb-6">
+        <div class="shrink-0">
+          <SketchCard class="bg-white p-4 pb-6 space-y-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
 
           <div class="flex items-center justify-between border-b border-slate-100 pb-2 px-0.5 gap-2">
 
             <template v-if="!isNotesFocused && typeId !== 3">
-              <button type="button"
+              <SketchButton type="button"
                 @click="openWalletPicker(isDebtOrReceivable ? debtWalletMode : (typeId === 1 ? 'dest' : 'source'))"
-                class="h-[38px] px-2.5 bg-accent-light hover:opacity-90 border border-accent/20 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 shadow-2xs max-w-[110px]">
+                class="h-[38px] px-2.5 bg-accent-light hover:opacity-90 text-slate-800 flex items-center gap-1 shrink-0 max-w-[110px]">
                 <span class="text-xs shrink-0 flex items-center justify-center">
                   <component
                     :is="resolveIcon((isDebtOrReceivable ? selectedDebtWallet : (typeId === 1 ? selectedDestWallet : selectedSourceWallet))?.icon)"
@@ -784,35 +772,33 @@ onMounted(loadOptions);
                 <span class="truncate text-[11px]">{{ (isDebtOrReceivable ? selectedDebtWallet : (typeId === 1 ?
                   selectedDestWallet : selectedSourceWallet))?.name || 'Dompet' }}</span>
                 <span class="text-[9px] text-accent shrink-0">▾</span>
-              </button>
+              </SketchButton>
             </template>
 
             <div :class="[isNotesFocused || typeId === 3 ? 'w-full' : 'flex-1 min-w-0']"
               class="transition-all space-y-2">
               <div v-if="isDebtOrReceivable" class="w-full">
-                <input v-model="partyName" type="text" list="subject-list"
+                <SketchInput v-model="partyName" type="text" list="subject-list"
                   :placeholder="typeId === 4 ? 'Nama Pemberi Hutang' : 'Nama Peminjam'"
-                  class="w-full h-[38px] bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 px-3 focus:outline-none focus:border-accent focus:bg-white transition-all truncate" />
+                  class="w-full h-[38px] truncate" />
                 <datalist id="subject-list">
                   <option v-for="s in subjects" :key="s" :value="s" />
                 </datalist>
               </div>
 
               <div v-if="isNotesFocused" class="space-y-1.5">
-                <textarea v-model="notes" @blur="isNotesFocused = false" rows="3" placeholder="Catatan..."
-                  class="w-full bg-slate-50 border border-accent rounded-xl text-xs font-semibold text-slate-800 p-2.5 focus:outline-none focus:bg-white resize-none leading-relaxed shadow-2xs"
-                  autoFocus></textarea>
+                <SketchInput v-model="notes" @blur="isNotesFocused = false" :lines="3" placeholder="Catatan..."
+                  class="w-full leading-relaxed" />
                 <div class="flex items-center justify-between">
                   <span class="text-[10px] text-slate-400 font-bold">Catatan Transaksi</span>
-                  <button @mousedown.prevent="isNotesFocused = false"
-                    class="px-2.5 py-1 bg-accent text-white rounded-lg text-xs font-extrabold shadow-2xs">
+                  <SketchButton @mousedown.prevent="isNotesFocused = false" class="px-2.5 py-1 bg-accent text-white">
                     Selesai
-                  </button>
+                  </SketchButton>
                 </div>
               </div>
 
-              <input v-else v-model="notes" @focus="isNotesFocused = true" type="text" placeholder="Catatan..."
-                class="w-full h-[38px] bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 px-3 focus:outline-none focus:border-accent focus:bg-white transition-all truncate" />
+              <SketchInput v-else v-model="notes" @focus="isNotesFocused = true" type="text" placeholder="Catatan..."
+                class="w-full h-[38px] truncate" />
             </div>
 
             <div v-if="!isNotesFocused" class="flex items-baseline gap-1 shrink-0 pl-1">
@@ -826,42 +812,43 @@ onMounted(loadOptions);
 
           <div class="flex gap-1.5 items-center">
 
-            <button type="button" @click="showDateModal = true"
-              class="flex-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-colors flex items-center justify-center gap-1 min-w-0"
+            <SketchButton type="button" @click="showDateModal = true"
+              class="flex-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-1 min-w-0"
               title="Pilih Tanggal Transaksi">
               <PhCalendarDots :size="16" class="shrink-0" />
               <span class="truncate">{{ formattedDateLabel }}</span>
-            </button>
+            </SketchButton>
 
             <!-- Scan Struk (AI) -->
-            <button type="button" @click="triggerOcrUpload" :disabled="ocrLoading"
-              class="flex-1 py-2 px-2.5 bg-indigo-50 border border-indigo-200/80 text-indigo-600 hover:bg-indigo-100 rounded-xl text-xs font-black transition-colors flex items-center justify-center gap-1.5 min-w-0"
+            <SketchButton type="button" @click="triggerOcrUpload" :disabled="ocrLoading"
+              class="flex-1 py-2 px-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center gap-1.5 min-w-0"
               title="Scan Struk / Bukti Transaksi dengan AI">
               <PhCamera :size="16" class="shrink-0" />
               <span class="truncate">{{ ocrLoading ? 'Scanning...' : 'Scan Struk' }}</span>
-            </button>
+            </SketchButton>
             <input type="file" ref="ocrFileInput" class="hidden" accept="image/*" @change="handleOcrFileChange" />
 
-            <button type="button" @click="showKeypad = !showKeypad" :class="[
-              'h-[36px] w-[36px] border rounded-xl transition-all flex items-center justify-center shrink-0',
+            <SketchButton type="button" @click="showKeypad = !showKeypad" :class="[
+              'h-[36px] w-[36px] flex items-center justify-center shrink-0',
               showKeypad
-                ? 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                : 'bg-accent-light text-accent border-accent/20'
+                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-accent-light text-accent'
             ]" :title="showKeypad ? 'Sembunyikan Papan Ketik' : 'Tampilkan Papan Ketik'">
               <PhKeyboard :size="18" />
-            </button>
+            </SketchButton>
 
-            <button type="button" @click="handleSubmit" :disabled="loading"
-              class="flex-1 py-2 px-3 bg-accent active:scale-98 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 min-w-0">
+            <SketchButton type="button" @click="handleSubmit" :disabled="loading"
+              class="flex-1 py-2 px-3 bg-accent text-white uppercase tracking-wider flex items-center justify-center gap-1.5 min-w-0">
               <PhFloppyDisk :size="16" class="shrink-0" />
               <span class="truncate">{{ loading ? '...' : 'Simpan' }}</span>
-            </button>
+            </SketchButton>
 
           </div>
 
           <div v-show="showKeypad" class="pt-1">
             <Keypad @key="handleKeypad" />
           </div>
+          </SketchCard>
         </div>
       </div>
     </div>
@@ -873,14 +860,14 @@ onMounted(loadOptions);
       <div v-if="showWalletModal"
         class="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
         @click.self="showWalletModal = false">
-        <div
-          class="w-full max-w-xs bg-white rounded-2xl p-4 shadow-2xl border border-slate-100 space-y-3 relative z-[101]">
+        <SketchBox
+          class="w-full max-w-xs bg-white p-4 space-y-3 relative z-[101]">
           <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Pilih Dompet {{ walletModalMode ===
             'source' ? 'Asal' : 'Tujuan' }}</h3>
 
           <div class="space-y-1.5 max-h-56 overflow-y-auto">
-            <button v-for="w in liquidWallets" :key="w.id" @click="selectWallet(w.id)"
-              class="w-full p-2.5 rounded-xl border border-slate-200 flex items-center justify-between hover:bg-slate-50 text-left">
+            <SketchButton v-for="w in liquidWallets" :key="w.id" @click="selectWallet(w.id)"
+              class="w-full p-2.5 flex items-center justify-between hover:bg-slate-50 text-left">
               <div class="flex items-center gap-2.5">
                 <span class="shrink-0 flex items-center justify-center text-slate-500 w-4 h-4">
                   <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="16" />
@@ -889,12 +876,12 @@ onMounted(loadOptions);
                 <span class="text-xs font-bold text-slate-900">{{ w.name }}</span>
               </div>
               <span class="text-xs font-bold text-accent">Rp {{ Number(w.balance).toLocaleString('id-ID') }}</span>
-            </button>
+            </SketchButton>
           </div>
 
-          <button @click="showWalletModal = false"
-            class="w-full py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl">Batal</button>
-        </div>
+          <SketchButton @click="showWalletModal = false"
+            class="w-full py-2 bg-slate-100 text-slate-600 font-bold text-xs">Batal</SketchButton>
+        </SketchBox>
       </div>
     </Teleport>
 
@@ -915,7 +902,7 @@ onMounted(loadOptions);
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showAddCategorySheet = false"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1">
-            <PhArrowLeft :size="24" weight="bold" />
+            <PhArrowLeft :size="24" />
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Tambah Kategori</h3>
           <div class="w-12"></div>
@@ -924,34 +911,34 @@ onMounted(loadOptions);
         <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-20">
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Nama Kategori</label>
-            <input v-model="newCatName" type="text" placeholder="Nama Kategori (cth: Belanja)"
-              class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
+            <SketchInput v-model="newCatName" type="text" placeholder="Nama Kategori (cth: Belanja)"
+              class="w-full" />
           </div>
 
           <div class="space-y-1.5 flex-1 flex flex-col min-h-0">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Pilih Icon</label>
-            <div class="flex-1 overflow-y-auto p-3 bg-white border border-slate-200 rounded-2xl space-y-4 no-scrollbar">
+            <SketchBox class="flex-1 overflow-y-auto p-3 bg-white space-y-4 no-scrollbar">
               <div v-for="g in ICON_GROUPS" :key="g.group" class="space-y-1.5">
                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider block px-1">{{ g.group
                 }}</span>
                 <div class="grid grid-cols-4 gap-2">
-                  <button v-for="ico in g.icons" :key="ico.name" type="button" @click="newCatIcon = ico.name"
-                    class="aspect-square rounded-2xl flex items-center justify-center transition-all hover:bg-slate-100 border border-slate-100 shrink-0"
-                    :class="newCatIcon === ico.name ? 'bg-accent-light border-accent text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
+                  <SketchBox v-for="ico in g.icons" :key="ico.name" @click="newCatIcon = ico.name"
+                    class="aspect-square flex items-center justify-center transition-all hover:bg-slate-100 shrink-0"
+                    :class="newCatIcon === ico.name ? 'bg-accent-light text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
                     :title="ico.label">
                     <component :is="resolveIcon(ico.name)" :size="28" />
-                  </button>
+                  </SketchBox>
                 </div>
               </div>
-            </div>
+            </SketchBox>
           </div>
         </div>
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
-          <button @click="handleAddCategory"
-            class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25">
+          <SketchButton @click="handleAddCategory"
+            class="w-full py-3 bg-accent text-white uppercase tracking-wider">
             Simpan Kategori
-          </button>
+          </SketchButton>
         </div>
       </div>
     </Teleport>
@@ -963,7 +950,7 @@ onMounted(loadOptions);
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showEditCategorySheet = false"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1">
-            <PhArrowLeft :size="24" weight="bold" />
+            <PhArrowLeft :size="24" />
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Ubah Kategori</h3>
           <button @click="handleDeleteCategory"
@@ -973,58 +960,37 @@ onMounted(loadOptions);
         <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-20">
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Nama Kategori</label>
-            <input v-model="editCatName" type="text" placeholder="Nama Kategori (cth: Belanja)"
-              class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
+            <SketchInput v-model="editCatName" type="text" placeholder="Nama Kategori (cth: Belanja)"
+              class="w-full" />
           </div>
 
           <div class="space-y-1.5 flex-1 flex flex-col min-h-0">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Pilih Icon</label>
-            <div class="flex-1 overflow-y-auto p-3 bg-white border border-slate-200 rounded-2xl space-y-4 no-scrollbar">
+            <SketchBox class="flex-1 overflow-y-auto p-3 bg-white space-y-4 no-scrollbar">
               <div v-for="g in ICON_GROUPS" :key="g.group" class="space-y-1.5">
                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider block px-1">{{ g.group
                 }}</span>
                 <div class="grid grid-cols-4 gap-2">
-                  <button v-for="ico in g.icons" :key="ico.name" type="button" @click="editCatIcon = ico.name"
-                    class="aspect-square rounded-2xl flex items-center justify-center transition-all hover:bg-slate-100 border border-slate-100 shrink-0"
-                    :class="editCatIcon === ico.name ? 'bg-accent-light border-accent text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
+                  <SketchBox v-for="ico in g.icons" :key="ico.name" @click="editCatIcon = ico.name"
+                    class="aspect-square flex items-center justify-center transition-all hover:bg-slate-100 shrink-0"
+                    :class="editCatIcon === ico.name ? 'bg-accent-light text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
                     :title="ico.label">
                     <component :is="resolveIcon(ico.name)" :size="28" />
-                  </button>
+                  </SketchBox>
                 </div>
               </div>
-            </div>
+            </SketchBox>
           </div>
         </div>
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
-          <button @click="handleUpdateCategory"
-            class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25">
+          <SketchButton @click="handleUpdateCategory"
+            class="w-full py-3 bg-accent text-white uppercase tracking-wider">
             Simpan Perubahan
-          </button>
+          </SketchButton>
         </div>
       </div>
     </Teleport>
 
   </div>
 </template>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(2px);
-}
-
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-2px);
-}
-
-.list-move {
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-</style>

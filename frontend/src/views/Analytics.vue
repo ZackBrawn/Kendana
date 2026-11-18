@@ -1,13 +1,19 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { api } from '../api';
-import { PhArrowUpRight, PhArrowDownLeft, PhHandshake, PhCoins, PhX, PhPencil, PhTrash, PhCaretLeft, PhCaretRight, PhCaretDown } from "@phosphor-icons/vue";
+import { PhArrowUpRight, PhArrowDownLeft, PhHandshake, PhCoins, PhX, PhPencil, PhTrash, PhCaretLeft, PhCaretRight, PhCaretDown } from "../utils/icons";
 import { Chart, registerables } from 'chart.js';
 import { useDate } from '../composables/useDate';
 import { formatRp, resolveIcon, groupTransactionsByDate, calculateGroupTotals } from '../utils/helpers';
 import DateFilter from '../components/DateFilter.vue';
 import Transaction from '../components/Transaction.vue';
+import SketchCard from '../components/SketchCard.vue';
+import SketchDivider from '../components/SketchDivider.vue';
+import RoughChart from '../components/RoughChart.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
+import SketchTabs from '../components/SketchTabs.vue';
+import SketchBox from '../components/SketchBox.vue';
+import SketchButton from '../components/SketchButton.vue';
 import { useRoute } from 'vue-router';
 
 Chart.register(...registerables);
@@ -37,7 +43,7 @@ const {
   nextMonth
 } = useDate();
 
-const showFilterModal = ref(false);
+const dateFilterRef = ref(null);
 
 const loadData = async () => {
   loading.value = true;
@@ -136,9 +142,18 @@ const hoveredIndex = ref(null);
 const barChartCanvas = ref(null);
 let barChartInstance = null;
 const barChartInterval = ref('day'); // 'day', 'week', 'month'
+const breakdownChartLabels = computed(() => breakdownData.value.map(item => item.name));
+const breakdownChartData = computed(() => breakdownData.value.map(item => item.total));
+const breakdownChartColors = computed(() =>
+  breakdownData.value.map((_, index) => CHART_COLORS[index % CHART_COLORS.length])
+);
 
 const setHoveredItem = (index) => {
   hoveredIndex.value = index;
+};
+
+const toggleHighlightedItem = (index) => {
+  highlightedIndex.value = highlightedIndex.value === index ? null : index;
 };
 
 const selectedItemHistory = ref(null);
@@ -151,6 +166,9 @@ const TYPE_ITEMS = [
   { id: 4, tab: 'Debt', label: 'Hutang', icon: PhHandshake, activeBg: 'bg-accent text-white', color: '#d97706' },
   { id: 5, tab: 'Receivable', label: 'Piutang', icon: PhCoins, activeBg: 'bg-accent text-white', color: '#0d9488' }
 ];
+
+// Tab items untuk SketchTabs (4 tipe transaksi di atas chart)
+const typeTabs = TYPE_ITEMS.map(item => ({ value: item.id, label: item.label, icon: item.icon }));
 
 const updateChart = () => {
   if (!chartCanvas.value) return;
@@ -311,7 +329,7 @@ const updateChart = () => {
 
               if (showTitle) {
                 titleLines.forEach(title => {
-                  innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
+                  innerHtml += `<div style="font-family: Inter, sans-serif; font-size:12px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
                 });
               }
 
@@ -322,7 +340,7 @@ const updateChart = () => {
                 style += ' border-width: 1px;';
                 style += ' display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;';
                 const span = `<span style="${style}"></span>`;
-                innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${Array.isArray(body) ? body.join(' ') : body}</div>`;
+                innerHtml += `<div style="font-family: Inter, sans-serif; font-size:12px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${Array.isArray(body) ? body.join(' ') : body}</div>`;
               });
 
               tooltipEl.innerHTML = innerHtml;
@@ -497,13 +515,33 @@ const processBarChartData = (transactions, interval) => {
   };
 };
 
-const updateBarChart = () => {
-  if (!barChartCanvas.value) {
-    setTimeout(() => {
-      if (barChartCanvas.value) updateBarChart();
-    }, 100);
-    return;
+const historyChartData = computed(() => {
+  if (!selectedItemHistory.value?.transactions) return { labels: [], totals: [] };
+
+  let chartTransactions = selectedItemHistory.value.transactions;
+  if (barChartInterval.value === 'month') {
+    chartTransactions = transactions.value.filter(transaction =>
+      breakdownType.value === 'category'
+        ? (transaction.category_name || 'Lainnya') === selectedItemHistory.value.name
+        : getWalletName(transaction) === selectedItemHistory.value.name
+    );
   }
+
+  return processBarChartData(chartTransactions, barChartInterval.value);
+});
+
+const barChartColor = computed(() =>
+  activeTypeId.value === 1 || activeTypeId.value === 5 ? '#10b981' : '#f43f5e'
+);
+
+const formatAxisValue = (value) => {
+  if (value >= 1000000) return `${value / 1000000}M`;
+  if (value >= 1000) return `${value / 1000}k`;
+  return value;
+};
+
+const updateBarChart = () => {
+  if (!barChartCanvas.value) return;
   
   if (!selectedItemHistory.value || !selectedItemHistory.value.transactions) {
     if (barChartInstance) {
@@ -593,7 +631,7 @@ const updateBarChart = () => {
 
               if (showTitle) {
                 titleLines.forEach(title => {
-                  innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
+                  innerHtml += `<div style="font-family: Inter, sans-serif; font-size:12px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${title}</div>`;
                 });
               }
 
@@ -604,7 +642,7 @@ const updateBarChart = () => {
                 style += ' border-width: 1px;';
                 style += ' display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;';
                 const span = `<span style="${style}"></span>`;
-                innerHtml += `<div style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${Array.isArray(body) ? body.join(' ') : body}</div>`;
+                innerHtml += `<div style="font-family: Inter, sans-serif; font-size:12px; font-weight: 600; color: #475569; display: flex; align-items: center;">${span}${Array.isArray(body) ? body.join(' ') : body}</div>`;
               });
 
               tooltipEl.innerHTML = innerHtml;
@@ -684,19 +722,17 @@ const formatGroupDateLabel = (dateStr) => {
 };
 
 const openFilterModal = () => {
-  showFilterModal.value = true;
+  dateFilterRef.value?.open();
 };
 
 const handleApplyPreset = (presetId) => {
   filterType.value = presetId;
-  showFilterModal.value = false;
 };
 
 const handleApplyCustom = ({ start, end }) => {
   filterType.value = 'custom';
   customStartDate.value = start;
   customEndDate.value = end;
-  showFilterModal.value = false;
 };
 
 const handleTransactionClick = (transaction) => {
@@ -795,28 +831,21 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center gap-1.5 w-full py-1 shrink-0">
-      <button v-for="item in TYPE_ITEMS" :key="item.id" type="button" @click="activeTypeId = item.id" :class="[
-        'rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center border shadow-2xs h-8 cursor-pointer transition-all duration-300',
-        activeTypeId === item.id
-          ? item.activeBg + ' border-transparent px-3.5 gap-1.5 flex-1'
-          : 'text-slate-600 border-none w-8 flex-none'
-      ]">
-        <component :is="item.icon" :size="24" />
-        <span v-if="activeTypeId === item.id">{{ item.label }}</span>
-      </button>
+    <div class="flex items-center justify-center gap-1.5 w-full py-1 shrink-0">
+      <SketchTabs :model-value="activeTypeId" class="sketch-tabs--compact w-96" :tabs="typeTabs"
+        @update:model-value="id => activeTypeId = id" />
     </div>
 
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-1 relative z-30">
         <div class="relative inline-block select-none z-40 w-24">
-          <button type="button" @click="breakdownType = (breakdownType === 'category' ? 'wallet' : 'category')"
-            class="w-full pr-5 py-1.5 text-xs font-bold text-slate-700 bg-accent-light rounded-lg cursor-pointer hover:border-accent hover:shadow-2xs transition-all flex items-center justify-center relative">
+          <SketchButton type="button" @click="breakdownType = (breakdownType === 'category' ? 'wallet' : 'category')"
+            class="w-full pr-5 py-1.5 text-xs font-bold text-slate-700 bg-accent-light rounded-lg cursor-pointer hover:shadow-2xs transition-all flex items-center justify-center relative">
             <span>{{ breakdownType === 'category' ? 'Kategori' : 'Dompet' }}</span>
             <div class="pointer-events-none absolute top-0 bottom-0 right-0 px-1.5 flex items-center text-accent">
-              <PhCaretRight :size="16" weight="fill" />
+              <PhCaretRight :size="16" />
             </div>
-          </button>
+          </SketchButton>
         </div>
       </div>
 
@@ -824,7 +853,7 @@ onUnmounted(() => {
         <button type="button" @click="prevMonth(transactions)" :disabled="!hasPrevMonth(transactions)"
           :class="['p-0.5 rounded-full transition-all cursor-pointer text-accent', !hasPrevMonth(transactions) ? 'opacity-35 cursor-not-allowed' : '']"
           aria-label="Previous Month">
-          <PhCaretLeft :size="16" weight="bold" />
+          <PhCaretLeft :size="16" />
         </button>
         <span @click="openFilterModal"
           class="text-[10px] font-black uppercase tracking-wider cursor-pointer hover:text-accent selection:bg-transparent transition-colors px-1">
@@ -833,25 +862,34 @@ onUnmounted(() => {
         <button type="button" @click="nextMonth(transactions)" :disabled="!hasNextMonth(transactions)"
           :class="['p-0.5 rounded-full transition-all cursor-pointer text-accent', !hasNextMonth(transactions) ? 'opacity-35 cursor-not-allowed' : '']"
           aria-label="Next Month">
-          <PhCaretRight :size="16" weight="bold" />
+          <PhCaretRight :size="16" />
         </button>
       </div>
     </div>
 
     <div v-if="loading" class="animate-pulse space-y-4">
-      <div class="h-48 bg-slate-200 rounded-2xl"></div>
-      <div class="h-20 bg-slate-200 rounded-2xl"></div>
+      <SketchBox class="h-48 bg-slate-200"></SketchBox>
+      <SketchBox class="h-20 bg-slate-200"></SketchBox>
     </div>
 
-    <div v-else-if="breakdownData.length === 0"
-      class="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-slate-400 text-xs font-medium">
+    <SketchBox v-else-if="breakdownData.length === 0"
+      class="bg-white p-8 text-center text-slate-400 text-xs font-medium">
       Belum ada riwayat transaksi
-    </div>
+    </SketchBox>
 
     <div v-else class="space-y-4">
       <div class="mb-6">
         <div class="relative w-80 h-80 mx-auto flex items-center justify-center">
-          <canvas ref="chartCanvas"></canvas>
+          <RoughChart
+            type="doughnut"
+            :labels="breakdownChartLabels"
+            :data="breakdownChartData"
+            :colors="breakdownChartColors"
+            :highlight-index="highlightedIndex ?? -1"
+            :format-value="formatRp"
+            @hover="setHoveredItem"
+            @select="toggleHighlightedItem"
+          />
           <div class="absolute flex flex-col items-center justify-center text-center pointer-events-none px-6 w-full">
             <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total</span>
             <span class="text-sm font-black tracking-tight mt-1"
@@ -863,13 +901,13 @@ onUnmounted(() => {
       </div>
 
       <div class="space-y-2">
-        <div v-for="(item, index) in breakdownData" :key="item.name" :id="'breakdown-item-' + index"
+        <SketchBox v-for="(item, index) in breakdownData" :key="item.name" :id="'breakdown-item-' + index"
           @click="openHistory(item)" @mouseenter="setHoveredItem(index)" @mouseleave="setHoveredItem(null)"
-          class="flex items-center justify-between p-2 rounded-2xl border transition-all duration-200 active:scale-[0.99] select-none relative cursor-pointer"
+          class="flex items-center justify-between p-2 transition-all duration-200 active:scale-[0.99] select-none relative cursor-pointer"
           :class="[
             highlightedIndex === index
-              ? 'bg-accent-light border-accent/30 shadow-xs scale-[1.01]'
-              : (hoveredIndex === index ? 'bg-slate-50 border-slate-200/80 shadow-3xs' : 'bg-white border-slate-100 hover:border-slate-200/50 hover:bg-slate-50/30')
+              ? 'bg-accent-light scale-[1.01]'
+              : (hoveredIndex === index ? 'bg-slate-50' : 'bg-white hover:bg-slate-50/30')
           ]">
 
           <div class="flex items-center gap-2.5 flex-1 min-w-0">
@@ -894,7 +932,7 @@ onUnmounted(() => {
               {{ activeTypeId === 1 || activeTypeId === 5 ? '+' : '-' }}{{ formatRp(item.total) }}
             </span>
           </div>
-        </div>
+        </SketchBox>
       </div>
     </div>
 
@@ -923,7 +961,7 @@ onUnmounted(() => {
 
             <button @click="selectedItemHistory = null"
               class="w-10 h-10 flex items-center justify-center text-accent transition-colors cursor-pointer">
-              <PhX :size="18" weight="bold" />
+              <PhX :size="18" />
             </button>
           </div>
 
@@ -938,27 +976,32 @@ onUnmounted(() => {
           <div class="flex-1 overflow-y-auto no-scrollbar bg-slate-50">
             <!-- Bar Chart Section -->
             <div class="px-4 pt-4 pb-2">
-              <div class="flex bg-slate-200/60 p-1 rounded-xl mb-4 w-full">
-                <button
-                  v-for="interval in [{ id: 'day', label: 'Harian' }, { id: 'week', label: 'Mingguan' }, { id: 'month', label: 'Bulanan' }]"
-                  :key="interval.id" @click="barChartInterval = interval.id"
-                  class="flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all"
-                  :class="barChartInterval === interval.id ? 'bg-white text-accent shadow-sm' : 'text-slate-500 hover:text-slate-700'">
-                  {{ interval.label }}
-                </button>
+              <div class="mb-4 w-full">
+                <SketchTabs v-model="barChartInterval" class="sketch-tabs--compact w-full" :tabs="[
+                  { value: 'day', label: 'Harian' },
+                  { value: 'week', label: 'Mingguan' },
+                  { value: 'month', label: 'Bulanan' }
+                ]" />
               </div>
               <div class="h-40 w-full relative">
-                <canvas ref="barChartCanvas"></canvas>
+                <RoughChart
+                  type="bar"
+                  :labels="historyChartData.labels"
+                  :data="historyChartData.totals"
+                  :color="barChartColor"
+                  :format-value="formatRp"
+                  :format-axis="formatAxisValue"
+                />
               </div>
             </div>
 
             <!-- Transaction List -->
             <div class="p-4 space-y-3.5 border-t border-slate-200/50 mt-2">
-              <div v-for="group in itemGroupedTransactions" :key="group.date"
-                class="mb-3.5 last:mb-0 shadow-md rounded-2xl">
+              <SketchCard v-for="group in itemGroupedTransactions" :key="group.date"
+                class="mb-3.5 last:mb-0 shadow-md">
                 <div @click="toggleGroup(group.date)"
                   class="flex items-center justify-between cursor-pointer select-none px-3.5 py-2.5 bg-slate-100 border border-slate-200/50 hover:bg-slate-200/50 transition-all"
-                  :class="isGroupCollapsed(group.date) ? 'rounded-xl' : 'rounded-t-xl border-b-0'">
+                  :class="isGroupCollapsed(group.date) ? '' : 'border-b-0'">
                   <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">
                     {{ formatGroupDateLabel(group.date) }}
                   </span>
@@ -973,16 +1016,18 @@ onUnmounted(() => {
                       - {{ formatRp(getGroupTotals(group.transactions).expense) }}
                     </span>
                   </div>
-                  <PhCaretDown :size="14" weight="fill" class="text-accent transition-transform duration-700"
+                  <PhCaretDown :size="14" class="text-accent transition-transform duration-700"
                     :class="{ '-rotate-180': isGroupCollapsed(group.date) }" />
                 </div>
 
+                <SketchDivider />
+
                 <div v-show="!isGroupCollapsed(group.date)"
-                  class="bg-white border border-slate-200/80 rounded-b-2xl rounded-t-none divide-y divide-slate-100 shadow-xs overflow-hidden">
+                  class="bg-white divide-y divide-slate-100 overflow-hidden">
                   <Transaction v-for="t in group.transactions" :key="t.id" :transaction="t" :hide-values="false"
                     @click="handleTransactionClick" @edit="handleSwipeEdit" @delete="handleSwipeDelete" />
                 </div>
-              </div>
+              </SketchCard>
             </div>
           </div>
         </div>
@@ -1001,8 +1046,8 @@ onUnmounted(() => {
     />
 
     <!-- Modular Date Filter Modal -->
-    <DateFilter v-if="showFilterModal" :filter-type="filterType" :presets-list="presetsList"
-      :start-date="customStartDate" :end-date="customEndDate" @close="showFilterModal = false"
+    <DateFilter ref="dateFilterRef" :filter-type="filterType" :presets-list="presetsList"
+      :start-date="customStartDate" :end-date="customEndDate"
       @apply-preset="handleApplyPreset" @apply-custom="handleApplyCustom" />
 
   </div>

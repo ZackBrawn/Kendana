@@ -2,7 +2,11 @@
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, showToast } from '../api';
-import { PhArrowLeft, PhPaperPlaneRight, PhX, PhCheck, PhWarning, PhFolder, PhWallet, PhRobot } from "@phosphor-icons/vue";
+import { PhArrowLeft, PhPaperPlaneRight, PhX, PhCheck, PhWarning, PhFolder, PhWallet, PhRobot } from "../utils/icons";
+import SketchButton from '../components/SketchButton.vue';
+import SketchInput from '../components/SketchInput.vue';
+import SketchSelect from '../components/SketchSelect.vue';
+import SketchBox from '../components/SketchBox.vue';
 
 const router = useRouter();
 
@@ -175,7 +179,7 @@ onMounted(loadChatData);
     <!-- Header -->
     <div class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
       <button @click="router.push('/other')" class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-        <PhArrowLeft :size="24" weight="bold" />
+        <PhArrowLeft :size="24" />
       </button>
       <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">{{ botProfile.name }}</h3>
       <div class="w-12"></div> <!-- Spacer -->
@@ -188,9 +192,9 @@ onMounted(loadChatData);
       </div>
 
       <div v-else-if="messages.length === 0" class="flex flex-col items-center justify-center text-center py-16 space-y-3">
-        <div class="w-16 h-16 rounded-3xl bg-indigo-50 flex items-center justify-center text-3xl shadow-xs">
+        <SketchBox class="w-16 h-16 bg-indigo-50 flex items-center justify-center text-3xl">
           <PhRobot :size="32" />
-        </div>
+        </SketchBox>
         <div>
           <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Mulai Obrolan Keuangan</h3>
           <p class="text-[10px] text-slate-400 max-w-[200px] mt-1 font-bold leading-normal">
@@ -200,11 +204,11 @@ onMounted(loadChatData);
       </div>
 
       <div v-else class="space-y-4">
-        <div v-for="msg in messages" :key="msg.id" :class="[
-          'flex flex-col max-w-[85%] rounded-3xl p-3.5 shadow-2xs leading-relaxed',
+        <SketchBox v-for="msg in messages" :key="msg.id" :class="[
+          'flex flex-col max-w-[85%] p-3.5 leading-relaxed',
           msg.role === 'user'
-            ? 'bg-accent text-white ml-auto rounded-tr-none'
-            : 'bg-white border border-slate-200/80 mr-auto rounded-tl-none text-slate-800'
+            ? 'bg-accent text-white ml-auto'
+            : 'bg-white mr-auto text-slate-800'
         ]">
           <!-- Components renderer -->
           <div v-for="(comp, cIdx) in msg.content" :key="cIdx" class="space-y-2">
@@ -212,13 +216,13 @@ onMounted(loadChatData);
             <p v-if="comp.type === 'text'" class="text-xs font-semibold whitespace-pre-wrap">{{ comp.text }}</p>
 
             <!-- Error component -->
-            <div v-else-if="comp.type === 'error'" class="p-2.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-[10px] font-bold flex items-center gap-1.5">
+            <SketchBox v-else-if="comp.type === 'error'" class="p-2.5 bg-rose-50 text-rose-600 text-[10px] font-bold flex items-center gap-1.5">
               <PhWarning :size="16" />
               <span>{{ comp.message }}</span>
-            </div>
+            </SketchBox>
 
             <!-- Transaction Card component -->
-            <div v-else-if="comp.type === 'transaction_card'" class="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 mt-2">
+            <SketchBox v-else-if="comp.type === 'transaction_card'" class="p-3 bg-slate-50 space-y-2 mt-2">
               <div class="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/50 text-indigo-700 tracking-wider">
                   {{ comp.transaction.type_key === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
@@ -251,37 +255,37 @@ onMounted(loadChatData);
               <!-- Selection box to connect wallet -->
               <div v-if="comp.needs_wallet && comp.is_draft" class="pt-2 space-y-1.5">
                 <label class="text-[9px] font-black uppercase text-slate-400 tracking-wider">Hubungkan Dompet Pembayaran</label>
-                <select @change="handleAssignWallet(comp.transaction.id, $event.target.value, msg.id)"
-                  class="w-full h-8 px-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 focus:outline-none focus:border-accent">
+                <SketchSelect @change="handleAssignWallet(comp.transaction.id, $event.target.value, msg.id)"
+                  class="w-full text-[10px] font-bold text-slate-700">
                   <option value="">-- Pilih Dompet --</option>
                   <option v-for="w in wallets" :key="w.id" :value="w.id">{{ w.name }}</option>
-                </select>
+                </SketchSelect>
               </div>
 
               <!-- Action buttons for draf confirmation -->
               <div v-if="comp.is_draft" class="flex gap-1.5 pt-2 shrink-0">
-                <button @click="handleCancel(comp.transaction.id)"
-                  class="flex-1 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1">
+                <SketchButton @click="handleCancel(comp.transaction.id)"
+                  class="flex-1 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1">
                   <PhX :size="12" />
                   <span>Batal</span>
-                </button>
-                <button @click="handleConfirm(comp.transaction.id)" :disabled="comp.needs_wallet"
-                  class="flex-1 h-8 bg-accent text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none">
+                </SketchButton>
+                <SketchButton @click="handleConfirm(comp.transaction.id)" :disabled="comp.needs_wallet"
+                  class="flex-1 h-8 bg-accent text-white text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none">
                   <PhCheck :size="12" />
                   <span>Konfirmasi</span>
-                </button>
+                </SketchButton>
               </div>
 
               <div v-else-if="comp.transaction.is_cancelled" class="pt-2 text-center text-[10px] font-black uppercase text-rose-500 tracking-wider">
                 Draf ini telah Dibatalkan / Expired
               </div>
               <div v-else class="pt-2 text-center text-[10px] font-black uppercase text-emerald-500 tracking-wider flex items-center justify-center gap-1">
-                <PhCheck :size="12" weight="bold" />
+                <PhCheck :size="12" />
                 Draf Berhasil Dicatat
               </div>
-            </div>
+            </SketchBox>
           </div>
-        </div>
+        </SketchBox>
 
         <!-- Typing state bubble -->
         <div v-if="isTyping" class="bg-transparent mr-auto p-3.5 text-slate-400 flex items-center gap-1">
@@ -295,12 +299,12 @@ onMounted(loadChatData);
     <!-- Composer input -->
     <div class="p-3 mb-3 bg-white border-t border-slate-200/80 shrink-0">
       <form @submit.prevent="handleSend" class="flex gap-2 relative">
-        <input v-model="inputText" type="text" placeholder="Ketik pesan Anda..."
-          class="flex-1 h-11 bg-slate-50 border border-slate-200 rounded-2xl px-4 text-xs font-bold text-slate-800 focus:outline-none focus:border-accent focus:bg-white transition-all pr-12" />
-        <button type="submit" :disabled="!inputText.trim()"
+        <SketchInput v-model="inputText" type="text" placeholder="Ketik pesan Anda..."
+          class="flex-1 h-11 px-4 text-xs font-bold text-slate-800 pr-12" />
+        <SketchButton type="submit" :disabled="!inputText.trim()"
           class="absolute right-1 top-1 bottom-1 w-9 bg-accent hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center shadow-md shadow-accent/25 transition-all">
-          <PhPaperPlaneRight :size="18" weight="bold" />
-        </button>
+          <PhPaperPlaneRight :size="18" />
+        </SketchButton>
       </form>
     </div>
   </div>

@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { PhCalendarBlank, PhCaretDown, PhCaretLeft, PhCaretRight } from "@phosphor-icons/vue";
+import { PhCalendarBlank, PhCaretDown, PhCaretLeft, PhCaretRight } from "../utils/icons";
+import SketchButton from './SketchButton.vue';
+import SketchBox from './SketchBox.vue';
 
 const props = defineProps({
   modelValue: {
@@ -301,12 +303,12 @@ const nextCalendarMonth = () => {
     class="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
     @click.self="emit('close')"
   >
-    <div
-      class="w-full max-w-xs bg-white rounded-xl p-4 shadow-2xl border border-slate-100 space-y-3.5 relative z-[121]"
+    <SketchBox
+      class="w-full max-w-xs bg-white p-4 space-y-3.5 relative z-[121]"
     >
       <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 px-1">
         <div class="flex items-center gap-1.5 text-accent">
-          <PhCalendarBlank :size="24" weight="bold" />
+          <PhCalendarBlank :size="24" />
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">
             {{ props.timeOnly ? 'Pilih Waktu' : (showMonthYearPicker ? 'Pilih Waktu & Periode' : 'Pilih Tanggal') }}
           </h3>
@@ -315,7 +317,7 @@ const nextCalendarMonth = () => {
           class="p-1 rounded-full text-slate-400 hover:bg-slate-100 text-xs font-bold cursor-pointer">✕</button>
       </div>
 
-      <div v-if="props.timeOnly" class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-4">
+      <SketchBox v-if="props.timeOnly" class="bg-slate-50 p-4 space-y-4">
         <div class="relative h-[120px] flex gap-2 overflow-hidden select-none">
           <div class="absolute inset-x-0 top-10 h-10 bg-slate-200/50 rounded-xl pointer-events-none z-10"></div>
           <div ref="hourRef" @scroll="handleScroll($event, 'hour')"
@@ -337,13 +339,13 @@ const nextCalendarMonth = () => {
             </div>
           </div>
         </div>
-        <button type="button" @click="emit('close')"
-          class="w-full py-2.5 bg-accent hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-500/25 transition-all cursor-pointer">
+        <SketchButton type="button" @click="emit('close')"
+          class="w-full py-2.5 bg-accent hover:bg-indigo-700 text-white font-extrabold text-xs transition-all cursor-pointer">
           Selesai Pilih
-        </button>
-      </div>
+        </SketchButton>
+      </SketchBox>
 
-      <div v-else-if="showMonthYearPicker" class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-4 animate-in fade-in duration-200">
+      <SketchBox v-else-if="showMonthYearPicker" class="bg-slate-50 p-4 space-y-4 animate-in fade-in duration-200">
         
         <div class="relative h-[120px] flex gap-2 overflow-hidden select-none">
           <div class="absolute inset-x-0 top-10 h-10 bg-slate-200/50 rounded-xl pointer-events-none z-10"></div>
@@ -419,39 +421,39 @@ const nextCalendarMonth = () => {
           </div>
         </div>
 
-        <button 
+        <SketchButton
           type="button"
           @click="showMonthYearPicker = false"
-          class="w-full py-2.5 bg-accent hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-500/25 transition-all cursor-pointer"
+          class="w-full py-2.5 bg-accent hover:bg-indigo-700 text-white font-extrabold text-xs transition-all cursor-pointer"
         >
           Selesai Pilih
-        </button>
-      </div>
+        </SketchButton>
+      </SketchBox>
 
-      <div v-else class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 space-y-3">
+      <SketchBox v-else class="bg-slate-50 p-3 space-y-3">
         <div class="flex justify-between items-center px-1">
-          <button type="button" @click="prevCalendarMonth"
-            class="w-7 h-7 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-650 hover:bg-slate-100 active:scale-95 text-xs font-bold shadow-2xs cursor-pointer"
+          <SketchButton type="button" @click="prevCalendarMonth"
+            class="w-7 h-7 bg-white flex items-center justify-center text-slate-650 hover:bg-slate-100 active:scale-95 text-xs font-bold cursor-pointer"
           >
-            <PhCaretLeft :size="14" weight="bold" />
-          </button>
-          
-          <button 
+            <PhCaretLeft :size="14" />
+          </SketchButton>
+
+          <SketchButton
             type="button"
             @click="showMonthYearPicker = true"
-            class="px-3 py-1 text-xs font-black text-slate-900 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-accent hover:shadow-xs transition-all flex items-center gap-1"
+            class="px-3 py-1 text-xs font-black text-slate-900 bg-white cursor-pointer flex items-center gap-1"
           >
             <span>
               {{ monthNamesList[calendarMonth] }} {{ calendarYear }}
             </span>
-            <PhCaretDown :size="10" weight="bold" class="text-slate-400" />
-          </button>
+            <PhCaretDown :size="10" class="text-slate-400" />
+          </SketchButton>
 
-          <button type="button" @click="nextCalendarMonth"
-            class="w-7 h-7 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-650 hover:bg-slate-100 active:scale-95 text-xs font-bold shadow-2xs cursor-pointer"
+          <SketchButton type="button" @click="nextCalendarMonth"
+            class="w-7 h-7 bg-white flex items-center justify-center text-slate-650 hover:bg-slate-100 active:scale-95 text-xs font-bold cursor-pointer"
           >
-            <PhCaretRight :size="14" weight="bold" />
-          </button>
+            <PhCaretRight :size="14" />
+          </SketchButton>
         </div>
 
         <div class="grid grid-cols-7 text-center">
@@ -477,8 +479,8 @@ const nextCalendarMonth = () => {
             {{ day }}
           </button>
         </div>
-      </div>
-    </div>
+      </SketchBox>
+    </SketchBox>
   </div>
 </template>
 

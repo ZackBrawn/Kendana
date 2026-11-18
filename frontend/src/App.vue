@@ -2,13 +2,16 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api, getAuthToken, setAuthToken } from './api';
-import { applyAccentColor } from './utils/theme';
 import { resolveIcon } from './utils/helpers';
 import Record from './components/Record.vue';
 import Detail from './components/Detail.vue';
 import Transaction from './components/Transaction.vue';
+import SketchBox from './components/SketchBox.vue';
+import SketchCard from './components/SketchCard.vue';
+import SketchInput from './components/SketchInput.vue';
+import SketchButton from './components/SketchButton.vue';
 import { startSyncListener } from './utils/syncService';
-import { PhPlus, PhHouse, PhCardholder, PhChartPieSlice, PhFaders, PhSignOut, PhCheck, PhX, PhWarning, PhMagnifyingGlass, PhArrowLeft, PhCaretRight, PhCaretDown, PhWifiSlash, PhArrowsClockwise } from "@phosphor-icons/vue";
+import { PhPlus, PhHouse, PhCardholder, PhChartPieSlice, PhFaders, PhSignOut, PhCheck, PhX, PhWarning, PhMagnifyingGlass, PhArrowLeft, PhCaretRight, PhCaretDown, PhWifiSlash, PhArrowsClockwise } from "./utils/icons";
 
 
 const hideChromeRoutes = ['Auth', 'Chat', 'Budgets', 'Notifications'];
@@ -29,9 +32,6 @@ const checkUser = async () => {
     try {
       const res = await api.getMe();
       user.value = res.user;
-      if (res.user && res.user.accent_color) {
-        applyAccentColor(res.user.accent_color);
-      }
     } catch {
       setAuthToken(null);
       router.push('/login');
@@ -325,22 +325,22 @@ onUnmounted(() => {
         <div v-if="user" class="flex items-center gap-2">
           <button @click="openSearchModal" title="Cari Global"
             class="p-1.5 rounded-lg text-slate-400 hover:text-accent hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer animate-pulse">
-            <PhMagnifyingGlass :size="16" weight="bold" />
+            <PhMagnifyingGlass :size="16" />
           </button>
           <span class="text-xs font-semibold text-slate-700 max-w-[80px] truncate">{{ user.name }}</span>
           <button @click="handleLogout" title="Logout"
             class="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer">
-            <PhSignOut :size="16" weight="bold" />
+            <PhSignOut :size="16" />
           </button>
         </div>
       </header>
       
       <div v-if="isOffline" class="bg-amber-100 text-amber-800 text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 shadow-xs z-20">
-        <PhWifiSlash :size="16" weight="bold" />
+        <PhWifiSlash :size="16" />
         Anda sedang offline. Data akan disinkronisasi saat online.
       </div>
       <div v-if="isSyncing" class="bg-blue-100 text-blue-800 text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 shadow-xs z-20">
-        <PhArrowsClockwise :size="16" weight="bold" class="animate-spin" />
+        <PhArrowsClockwise :size="16" class="animate-spin" />
         Menyinkronkan data...
       </div>
 
@@ -353,35 +353,35 @@ onUnmounted(() => {
 
         <router-link to="/"
           class="nav-link flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-accent transition-all duration-200 py-1 px-3"
-          active-class="text-accent font-bold">
+          active-class="nav-link-active text-accent font-bold">
           <PhHouse :size="24" />
-          <span class="text-[9px] transition-all">Home</span>
+          <span class="nav-label text-[9px] transition-all">Home</span>
         </router-link>
 
         <router-link to="/wallets"
           class="nav-link flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-accent transition-all duration-200 py-1 px-3"
-          active-class="text-accent font-bold">
+          active-class="nav-link-active text-accent font-bold">
           <PhCardholder :size="24" />
-          <span class="text-[9px] transition-all">Aset</span>
+          <span class="nav-label text-[9px] transition-all">Aset</span>
         </router-link>
 
-        <button @click="handleOpenCreateModal"
-          class="flex flex-col items-center justify-center text-white hover:opacity-90 transition-all py-1.5 px-3.5 bg-accent rounded-full shadow-md shrink-0">
+        <SketchButton @click="handleOpenCreateModal" title="Buat Transaksi"
+          class="nav-create-button flex flex-col items-center justify-center text-white py-1.5 px-3.5 bg-accent shrink-0">
           <PhPlus :size="24" />
-        </button>
+        </SketchButton>
 
         <router-link to="/analytics"
           class="nav-link flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-accent transition-all duration-200 py-1 px-3"
-          active-class="text-accent font-bold">
+          active-class="nav-link-active text-accent font-bold">
           <PhChartPieSlice :size="24" />
-          <span class="text-[9px] transition-all">Grafik</span>
+          <span class="nav-label text-[9px] transition-all">Grafik</span>
         </router-link>
 
         <router-link to="/other"
           class="nav-link flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-accent transition-all duration-200 py-1 px-3"
-          active-class="text-accent font-bold">
+          active-class="nav-link-active text-accent font-bold">
           <PhFaders :size="24" />
-          <span class="text-[9px] transition-all">Lainnya</span>
+          <span class="nav-label text-[9px] transition-all">Lainnya</span>
         </router-link>
       </nav>
 
@@ -394,13 +394,13 @@ onUnmounted(() => {
           <div class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 shadow-xs shrink-0">
             <button @click="closeSearchModal"
               class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-              <PhArrowLeft :size="24" weight="bold" />
+              <PhArrowLeft :size="24" />
             </button>
 
             <div class="relative flex-1">
-              <PhMagnifyingGlass class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
-              <input v-model="searchQuery" @input="handleSearchInput" type="text" placeholder="Cari transaksi, dompet, kategori..."
-                class="w-full h-11 bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 text-xs font-bold text-slate-800 focus:outline-none focus:border-accent focus:bg-white transition-all"
+              <PhMagnifyingGlass class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" :size="18" />
+              <SketchInput v-model="searchQuery" @update:model-value="handleSearchInput" type="text" placeholder="Cari transaksi, dompet, kategori..."
+                class="w-full h-11 pl-11 pr-4 text-xs font-bold text-slate-800"
                 autofocus />
             </div>
           </div>
@@ -423,8 +423,8 @@ onUnmounted(() => {
             <div v-else class="space-y-4">
               <!-- Non-Transactions (Wallets & Categories) -->
               <div v-if="searchNonTransactions.length > 0" class="space-y-2">
-                <button v-for="res in searchNonTransactions" :key="res.id" @click="handleSearchResultClick(res)"
-                  class="w-full p-3 bg-white border border-slate-200/60 rounded-2xl flex items-center justify-between hover:bg-slate-100 hover:border-slate-300 active:scale-[0.98] transition-all text-left shadow-xs">
+                <SketchBox v-for="res in searchNonTransactions" :key="res.id" @click="handleSearchResultClick(res)"
+                  class="w-full p-3 bg-white flex items-center justify-between hover:bg-slate-100 active:scale-[0.98] transition-all text-left cursor-pointer">
                   <div class="flex items-center gap-3 min-w-0 flex-1">
                     <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700 shadow-3xs shrink-0">
                       <component :is="resolveIcon(res.icon)" v-if="resolveIcon(res.icon)" :size="20" />
@@ -444,13 +444,13 @@ onUnmounted(() => {
                       <p class="text-[10px] text-slate-400 font-bold mt-1 truncate leading-none">{{ res.description }}</p>
                     </div>
                   </div>
-                  <PhCaretRight :size="14" weight="bold" class="text-slate-400 shrink-0" />
-                </button>
+                  <PhCaretRight :size="14" class="text-slate-400 shrink-0" />
+                </SketchBox>
               </div>
 
               <!-- Transactions Grouped by Date -->
               <div v-if="searchGroupedTransactions.length > 0" class="space-y-3.5">
-                <div v-for="group in searchGroupedTransactions" :key="group.date" class="shadow-md rounded-2xl">
+                <SketchCard v-for="group in searchGroupedTransactions" :key="group.date" class="shadow-md">
                   
                   <!-- Date Header -->
                   <div @click="toggleSearchGroup(group.date)"
@@ -459,13 +459,13 @@ onUnmounted(() => {
                     <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">
                       {{ formatSearchGroupDate(group.date) }}
                     </span>
-                    <PhCaretDown :size="14" weight="fill" class="text-accent transition-transform duration-700"
+                    <PhCaretDown :size="14" class="text-accent transition-transform duration-700"
                       :class="{ '-rotate-180': isSearchGroupCollapsed(group.date) }" />
                   </div>
 
                   <!-- Transactions List -->
                   <div v-show="!isSearchGroupCollapsed(group.date)"
-                    class="bg-white border border-slate-200/80 rounded-b-2xl rounded-t-none divide-y divide-slate-100 shadow-xs overflow-hidden">
+                    class="bg-white divide-y divide-slate-100 overflow-hidden">
                     <Transaction
                       v-for="t in group.transactions"
                       :key="t.id"
@@ -476,7 +476,7 @@ onUnmounted(() => {
                     />
                   </div>
 
-                </div>
+                </SketchCard>
               </div>
 
             </div>
@@ -491,19 +491,19 @@ onUnmounted(() => {
         @edit="handleOpenEditFromDetail" @deleted="handleDeletedFromDetail" />
 
       <div class="fixed top-4 right-4 z-[999] flex flex-col gap-2 max-w-[280px] pointer-events-none">
-        <div
+        <SketchBox
           v-for="toast in toasts"
           :key="toast.id"
-          class="p-3.5 rounded-xl shadow-lg border text-xs font-bold transition-all duration-300 pointer-events-auto flex items-center gap-2 bg-white animate-in slide-in-from-top-2"
+          class="p-3.5 text-xs font-bold transition-all duration-300 pointer-events-auto flex items-center gap-2 bg-white animate-in slide-in-from-top-2"
           :class="[
-            toast.type === 'success' ? 'text-accent border-accent-hover/55 bg-accent-hover/95' : 
-            toast.type === 'error' ? 'text-rose-800 border-rose-200 bg-rose-50/95' : 
-            'text-slate-800 border-slate-200 bg-slate-50/95'
+            toast.type === 'success' ? 'text-accent bg-accent-hover/95' : 
+            toast.type === 'error' ? 'text-rose-800 bg-rose-50/95' : 
+            'text-slate-800 bg-slate-50/95'
           ]"
         >
-          <component :is="toast.type === 'success' ? PhCheck : toast.type === 'error' ? PhX : PhWarning" :size="16" weight="bold" class="shrink-0" />
+          <component :is="toast.type === 'success' ? PhCheck : toast.type === 'error' ? PhX : PhWarning" :size="16" class="shrink-0" />
           <span class="flex-1 break-words leading-tight">{{ toast.message }}</span>
-        </div>
+        </SketchBox>
       </div>
     </div>
   </div>

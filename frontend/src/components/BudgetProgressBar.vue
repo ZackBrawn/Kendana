@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { RProgress, RGraphicsConfig } from 'roughness';
 import { formatRp } from '../utils/helpers';
 
 const props = defineProps({
@@ -29,6 +30,12 @@ const props = defineProps({
   heightClass: {
     type: String,
     default: 'h-8'
+  },
+  // Menggambar track + isi bar dengan roughness (gaya gambar tangan).
+  // Height mengikuti .sketch-progress di theme.css (default 2rem / h-8).
+  rough: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -48,10 +55,53 @@ const remainingAmount = computed(() => {
 const roundedClass = computed(() => {
   return props.rounded === 'xl' ? 'rounded-xl' : 'rounded-full';
 });
+
+// Mode rough: lebar area teks putih diklip ke ujung isi bar (sama seperti
+// trik overflow-hidden pada mode biasa).
+const clampedPercentage = computed(() => Math.min(100, Math.max(0, numPercentage.value)));
+const clippedTextWidth = computed(() => (100 / Math.max(1, clampedPercentage.value)) * 100 + '%');
 </script>
 
 <template>
+  <!-- MODE ROUGHNESS: track + isi digambar RProgress (roughness) -->
+  <RGraphicsConfig v-if="rough" :options="{ roughness: 2.4, bowing: 2.2, seed: 7 }">
+    <RProgress class="sketch-progress" :value="numPercentage / 100" :min="0" :max="1">
+      <!-- Teks di atas track (terlihat di area yang belum terisi) -->
+      <div
+        class="absolute inset-0 flex items-center px-3 text-[10px] font-bold text-slate-500 select-none pointer-events-none"
+        :class="variant === 'detailed' ? 'justify-between' : 'justify-center'"
+      >
+        <template v-if="variant === 'detailed'">
+          <span>Limit: {{ formatRp(limitAmount) }}</span>
+          <span>{{ roundedPercentage }}%</span>
+          <span>Sisa: {{ formatRp(remainingAmount) }}</span>
+        </template>
+        <span v-else>{{ roundedPercentage }}%</span>
+      </div>
+
+      <!-- Teks di dalam isi bar (terpotong tepat di ujung isi) -->
+      <div
+        class="absolute top-0 bottom-0 left-0 overflow-hidden pointer-events-none"
+        :style="{ width: clampedPercentage + '%' }"
+      >
+        <div
+          class="absolute top-0 bottom-0 left-0 flex items-center px-3 text-[10px] font-bold text-white select-none"
+          :class="variant === 'detailed' ? 'justify-between' : 'justify-center'"
+          :style="{ width: clippedTextWidth }"
+        >
+          <template v-if="variant === 'detailed'">
+            <span>Limit: {{ formatRp(limitAmount) }}</span>
+            <span>{{ roundedPercentage }}%</span>
+            <span>Sisa: {{ formatRp(remainingAmount) }}</span>
+          </template>
+          <span v-else>{{ roundedPercentage }}%</span>
+        </div>
+      </div>
+    </RProgress>
+  </RGraphicsConfig>
+
   <div
+    v-else
     class="w-full overflow-hidden bg-slate-100 relative shadow-inner"
     :class="[heightClass, roundedClass]"
   >
@@ -66,7 +116,7 @@ const roundedClass = computed(() => {
 
       <!-- Progress Fill (Active bar) -->
       <div
-        class="h-full transition-all duration-500 bg-accent relative overflow-hidden"
+        class="h-full transition-all duration-500 bg-progress relative overflow-hidden"
         :class="roundedClass"
         :style="{ width: Math.min(100, Math.max(0, numPercentage)) + '%' }"
       >
@@ -91,7 +141,7 @@ const roundedClass = computed(() => {
 
       <!-- Progress Fill -->
       <div
-        class="h-full transition-all duration-500 bg-accent relative overflow-hidden"
+        class="h-full transition-all duration-500 bg-progress relative overflow-hidden"
         :class="roundedClass"
         :style="{ width: Math.min(100, Math.max(0, numPercentage)) + '%' }"
       >

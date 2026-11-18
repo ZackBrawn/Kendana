@@ -6,7 +6,7 @@ import {
   PhArrowLeft, PhPlus, PhPencil, PhTrash, PhCalendar, PhCheck, PhX, 
   PhWarning, PhFolder, PhTag, PhPiggyBank, PhInfo, PhCaretDown, PhCaretUp,
   PhMagnifyingGlass, PhWallet
-} from "@phosphor-icons/vue";
+} from "../utils/icons";
 import { 
   formatRp, 
   resolveIcon, 
@@ -19,8 +19,15 @@ import {
 import { AVAILABLE_ICONS } from '../utils/iconList';
 import Calendar from '../components/Calendar.vue';
 import Transaction from '../components/Transaction.vue';
+import SketchCard from '../components/SketchCard.vue';
+import SketchDivider from '../components/SketchDivider.vue';
 import BudgetProgressBar from '../components/BudgetProgressBar.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
+import SketchButton from '../components/SketchButton.vue';
+import SketchInput from '../components/SketchInput.vue';
+import SketchSelect from '../components/SketchSelect.vue';
+import SketchSwitch from '../components/SketchSwitch.vue';
+import SketchBox from '../components/SketchBox.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -293,10 +300,17 @@ const openBudgetDetails = async (budgetId) => {
 };
 
 // Delete budget
-const handleDeleteBudget = async (id) => {
-  if (!confirm('Apakah Anda yakin ingin menghapus anggaran ini?')) return;
+const showBudgetDeleteConfirm = ref(false);
+
+const handleDeleteBudget = () => {
+  showBudgetDeleteConfirm.value = true;
+};
+
+const confirmBudgetDelete = async () => {
+  showBudgetDeleteConfirm.value = false;
+  if (!selectedBudget.value) return;
   try {
-    await api.deleteBudget(id);
+    await api.deleteBudget(selectedBudget.value.id);
     showToast('Anggaran berhasil dihapus', 'success');
     showDetailModal.value = false;
     selectedBudget.value = null;
@@ -397,9 +411,9 @@ const getProgressTextClass = (percent) => {
 };
 
 const getProgressBorderClass = (percent) => {
-  if (percent >= 100) return 'border-rose-100 bg-rose-50/40';
-  if (percent >= 80) return 'border-amber-100 bg-amber-50/40';
-  return 'border-emerald-100 bg-emerald-50/40';
+  if (percent >= 100) return 'bg-rose-50/40';
+  if (percent >= 80) return 'bg-amber-50/40';
+  return 'bg-emerald-50/40';
 };
 
 // Helper for category names formatting
@@ -446,11 +460,11 @@ onMounted(async () => {
     <!-- Header -->
     <div class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
       <button @click="router.push('/other')" class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-        <PhArrowLeft :size="24" weight="bold" />
+        <PhArrowLeft :size="24" />
       </button>
       <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Anggaran & Budget</h3>
       <button @click="openCreateModal" class="w-10 h-10 flex items-center justify-center text-accent transition-colors cursor-pointer">
-        <PhPlus :size="22" weight="bold" />
+        <PhPlus :size="22" />
       </button>
     </div>
 
@@ -459,25 +473,25 @@ onMounted(async () => {
 
     <!-- Loading Screen -->
     <div v-if="loading" class="animate-pulse space-y-3">
-      <div class="h-28 bg-white border border-slate-200 rounded-2xl"></div>
-      <div class="h-28 bg-white border border-slate-200 rounded-2xl"></div>
+      <SketchBox class="h-28 bg-white"></SketchBox>
+      <SketchBox class="h-28 bg-white"></SketchBox>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="budgets.length === 0" class="bg-white border border-slate-200/60 rounded-2xl p-8 text-center shadow-md space-y-3">
+    <SketchCard v-else-if="budgets.length === 0" class="bg-white p-8 text-center space-y-3">
       <div class="w-16 h-16 bg-indigo-50 text-accent rounded-2xl flex items-center justify-center mx-auto shadow-3xs">
-        <PhPiggyBank :size="36" weight="bold" />
+        <PhPiggyBank :size="36" />
       </div>
       <div class="space-y-1">
         <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider">Belum Ada Anggaran</h4>
         <p class="text-[11px] text-slate-500">Buat budget limit pengeluaran bulanan atau kustom untuk mengontrol keuangan Anda secara efisien.</p>
       </div>
-    </div>
+    </SketchCard>
 
     <!-- Budget List Grid -->
     <div v-else class="space-y-3">
-      <div v-for="b in budgets" :key="b.id" @click="openBudgetDetails(b.id)"
-        class="bg-white border border-slate-200/60 rounded-2xl p-3.5 shadow-md hover:bg-slate-50/50 transition-all cursor-pointer flex flex-col gap-3 relative overflow-hidden animate-in fade-in duration-200">
+      <SketchCard v-for="b in budgets" :key="b.id" @click="openBudgetDetails(b.id)"
+        class="bg-white p-3.5 hover:bg-slate-50/50 transition-all cursor-pointer flex flex-col gap-3 relative overflow-hidden animate-in fade-in duration-200">
         
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-3 min-w-0">
@@ -503,6 +517,7 @@ onMounted(async () => {
           <BudgetProgressBar
             variant="compact"
             rounded="full"
+            rough
             :limit-amount="b.limit_amount"
             :spent-amount="b.spent_amount"
             :percentage-used="b.percentage_used"
@@ -524,7 +539,7 @@ onMounted(async () => {
           "{{ b.notes }}"
         </p>
 
-      </div>
+      </SketchCard>
     </div>
 
     <!-- DETAIL BUDGET MODAL -->
@@ -534,15 +549,15 @@ onMounted(async () => {
         
         <header class="p-4 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-20">
           <button @click="showDetailModal = false" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex items-center">
-            <PhArrowLeft :size="20" weight="bold" />
+            <PhArrowLeft :size="20" />
           </button>
           <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Detail Anggaran</h3>
           <div class="flex items-center gap-1.5">
             <button @click="openEditModal(selectedBudget)" class="p-2 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer">
-              <PhPencil :size="14" weight="bold" />
+              <PhPencil :size="14" />
             </button>
-            <button @click="handleDeleteBudget(selectedBudget.id)" class="p-2 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 flex items-center justify-center cursor-pointer">
-              <PhTrash :size="14" weight="bold" />
+            <button @click="handleDeleteBudget" class="p-2 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 flex items-center justify-center cursor-pointer">
+              <PhTrash :size="14" />
             </button>
           </div>
         </header>
@@ -554,7 +569,7 @@ onMounted(async () => {
 
         <div v-else-if="selectedBudget" class="flex-1 overflow-y-auto p-4 space-y-4">
           <!-- Overview Card -->
-          <div class="border rounded-2xl p-4 flex flex-col gap-3.5" :class="getProgressBorderClass(selectedBudget.percentage_used)">
+          <SketchBox class="p-4 flex flex-col gap-3.5" :class="getProgressBorderClass(selectedBudget.percentage_used)">
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 rounded-xl bg-accent text-white flex items-center justify-center text-xl shrink-0">
                 <component :is="resolveIcon(selectedBudget.icon)" v-if="resolveIcon(selectedBudget.icon)" :size="26" />
@@ -567,18 +582,19 @@ onMounted(async () => {
             </div>
 
             <!-- Notes -->
-            <div v-if="selectedBudget.notes" class="bg-white/50 border border-slate-100 rounded-xl p-2.5 text-[10px] text-slate-600 leading-normal">
+            <SketchBox v-if="selectedBudget.notes" class="bg-white/50 p-2.5 text-[10px] text-slate-600 leading-normal">
               <div class="font-bold text-slate-700 uppercase tracking-wider text-[8px] mb-0.5 flex items-center gap-1">
                 <PhInfo :size="10" /> Catatan:
               </div>
               "{{ selectedBudget.notes }}"
-            </div>
+            </SketchBox>
 
             <!-- Progress Info -->
             <div class="space-y-1.5">
               <BudgetProgressBar
                 variant="detailed"
                 rounded="xl"
+                rough
                 :limit-amount="selectedBudget.limit_amount"
                 :spent-amount="selectedBudget.spent_amount"
                 :percentage-used="selectedBudget.percentage_used"
@@ -588,10 +604,10 @@ onMounted(async () => {
                 <span class="text-slate-500">{{ getRemainingLabel(selectedBudget) }}</span>
               </div>
             </div>
-          </div>
+          </SketchBox>
 
           <!-- Configuration Scope Info -->
-          <div class="bg-slate-50 border border-slate-200/50 rounded-2xl p-3 text-[10px] text-slate-600 space-y-2">
+          <SketchBox class="bg-slate-50 p-3 text-[10px] text-slate-600 space-y-2">
             <div class="flex justify-between items-center py-1 border-b border-slate-100">
               <span class="font-bold text-slate-400 uppercase tracking-wider">Cakupan Dompet:</span>
               <span class="font-extrabold text-slate-800">
@@ -610,23 +626,23 @@ onMounted(async () => {
                 {{ formatDate(selectedBudget.current_cycle?.start) }} – {{ formatDate(selectedBudget.current_cycle?.end) }}
               </span>
             </div>
-          </div>
+          </SketchBox>
 
           <!-- Transaction List In current Period -->
           <div class="space-y-2">
 
-            <div v-if="transactions.length === 0" class="bg-slate-50 border border-slate-200/40 rounded-2xl p-6 text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <SketchBox v-if="transactions.length === 0" class="bg-slate-50 p-6 text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               Tidak ada pengeluaran terdeteksi dalam siklus budget ini.
-            </div>
+            </SketchBox>
 
             <div v-else class="space-y-3.5">
               <!-- Daily Group Container -->
-              <div v-for="group in groupedTransactions" :key="group.date" class="mb-3.5 shadow-xs rounded-2xl overflow-hidden border border-slate-200/50">
+              <SketchCard v-for="group in groupedTransactions" :key="group.date" class="mb-3.5 shadow-xs border border-slate-200/50">
 
                 <!-- Date Header (Collapsible) -->
                 <div @click="toggleGroup(group.date)"
                   class="flex items-center justify-between cursor-pointer select-none px-3 py-2 bg-slate-100/80 hover:bg-slate-200/40 transition-all"
-                  :class="isCollapsed(group.date) ? 'rounded-2xl' : 'rounded-t-2xl border-b border-slate-200/50'">
+                  :class="isCollapsed(group.date) ? '' : 'border-b border-slate-200/50'">
                   <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">
                     {{ formatGroupDateLabel(group.date) }}
                   </span>
@@ -641,9 +657,11 @@ onMounted(async () => {
                   <component :is="isCollapsed(group.date) ? PhCaretDown : PhCaretUp" :size="12" class="text-slate-400" />
                 </div>
 
+                <SketchDivider />
+
                 <!-- Day Transactions Wrapper (Collapsible) -->
                 <div v-show="!isCollapsed(group.date)"
-                  class="bg-white rounded-b-2xl rounded-t-none divide-y divide-slate-100 overflow-hidden">
+                  class="bg-white divide-y divide-slate-100 overflow-hidden">
                   <Transaction
                     v-for="t in group.transactions"
                     :key="t.id"
@@ -654,7 +672,7 @@ onMounted(async () => {
                     @delete="handleSwipeDelete"
                   />
                 </div>
-              </div>
+              </SketchCard>
             </div>
           </div>
         </div>
@@ -671,19 +689,19 @@ onMounted(async () => {
       
       <header class="p-4 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-20">
         <button @click="showFormModal = false" class="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50">
-          <PhX :size="20" weight="bold" />
+          <PhX :size="20" />
         </button>
         <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">
           {{ isEditing ? 'Edit Anggaran' : 'Buat Anggaran Baru' }}
         </h3>
-        <button @click="handleSaveBudget" class="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer">
+        <SketchButton @click="handleSaveBudget" class="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer">
           Simpan
-        </button>
+        </SketchButton>
       </header>
 
       <div class="flex-1 overflow-y-auto p-4 space-y-4">
         <!-- Main Form Fields -->
-        <div class="space-y-1 bg-white border border-slate-200/60 rounded-2xl px-4 divide-y divide-slate-100">
+        <SketchCard class="space-y-1 bg-white px-4 divide-y divide-slate-100">
           
           <!-- Nama Budget -->
           <div class="flex items-center justify-between gap-3 py-3">
@@ -695,10 +713,10 @@ onMounted(async () => {
           <!-- Ikon Anggaran -->
           <div class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Ikon Anggaran</label>
-            <button type="button" @click="showIconPage = true" 
-              class="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center bg-transparent hover:bg-slate-100 cursor-pointer shrink-0">
+            <SketchButton type="button" @click="showIconPage = true"
+              class="w-9 h-9 rounded-xl flex items-center justify-center bg-transparent hover:bg-slate-100 cursor-pointer shrink-0">
               <component :is="resolveIcon(iconName)" v-if="resolveIcon(iconName)" :size="20" class="text-accent" />
-            </button>
+            </SketchButton>
           </div>
 
           <!-- Budget Limit -->
@@ -712,16 +730,16 @@ onMounted(async () => {
           <div class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Cakupan Dompet</label>
             <div class="flex gap-1.5 shrink-0">
-              <button type="button" @click="walletScope = 'all'"
-                class="px-2.5 py-1.5 border rounded-lg text-xs font-normal transition-all"
-                :class="walletScope === 'all' ? 'border-accent text-accent bg-accent/5' : 'border-slate-200 text-slate-600 bg-transparent'">
+              <SketchButton type="button" @click="walletScope = 'all'"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-normal transition-all"
+                :class="walletScope === 'all' ? 'text-accent bg-accent/5' : 'text-slate-600 bg-transparent'">
                 Semua
-              </button>
-              <button type="button" @click="walletScope = 'single'"
-                class="px-2.5 py-1.5 border rounded-lg text-xs font-normal transition-all"
-                :class="walletScope === 'single' ? 'border-accent text-accent bg-accent/5' : 'border-slate-200 text-slate-600 bg-transparent'">
+              </SketchButton>
+              <SketchButton type="button" @click="walletScope = 'single'"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-normal transition-all"
+                :class="walletScope === 'single' ? 'text-accent bg-accent/5' : 'text-slate-600 bg-transparent'">
                 Dompet Spesifik
-              </button>
+              </SketchButton>
             </div>
           </div>
 
@@ -743,16 +761,16 @@ onMounted(async () => {
           <div class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Cakupan Kategori</label>
             <div class="flex gap-1.5 shrink-0">
-              <button type="button" @click="categoryScope = 'all'"
-                class="px-2.5 py-1.5 border rounded-lg text-xs font-normal transition-all"
-                :class="categoryScope === 'all' ? 'border-accent text-accent bg-accent/5' : 'border-slate-200 text-slate-600 bg-transparent'">
+              <SketchButton type="button" @click="categoryScope = 'all'"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-normal transition-all"
+                :class="categoryScope === 'all' ? 'text-accent bg-accent/5' : 'text-slate-600 bg-transparent'">
                 Semua
-              </button>
-              <button type="button" @click="categoryScope = 'specific'"
-                class="px-2.5 py-1.5 border rounded-lg text-xs font-normal transition-all"
-                :class="categoryScope === 'specific' ? 'border-accent text-accent bg-accent/5' : 'border-slate-200 text-slate-600 bg-transparent'">
+              </SketchButton>
+              <SketchButton type="button" @click="categoryScope = 'specific'"
+                class="px-2.5 py-1.5 rounded-lg text-xs font-normal transition-all"
+                :class="categoryScope === 'specific' ? 'text-accent bg-accent/5' : 'text-slate-600 bg-transparent'">
                 Kategori Spesifik
-              </button>
+              </SketchButton>
             </div>
           </div>
 
@@ -778,34 +796,30 @@ onMounted(async () => {
           <!-- Period Selection -->
           <div class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Tipe Periode *</label>
-            <div class="relative">
-              <select v-model="periodType" 
-                class="pl-3 pr-7 py-1.5 border border-slate-200/80 focus:border-accent rounded-xl text-xs focus:outline-none bg-slate-50/50 text-right appearance-none cursor-pointer">
-                <option value="daily">Harian</option>
-                <option value="weekly">Mingguan</option>
-                <option value="monthly">Bulanan</option>
-                <option value="yearly">Tahunan</option>
-                <option value="custom">Kustom</option>
-              </select>
-              <PhCaretDown :size="10" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
+            <SketchSelect v-model="periodType" class="w-40 text-xs">
+              <option value="daily">Harian</option>
+              <option value="weekly">Mingguan</option>
+              <option value="monthly">Bulanan</option>
+              <option value="yearly">Tahunan</option>
+              <option value="custom">Kustom</option>
+            </SketchSelect>
           </div>
 
           <!-- Multiplier Control -->
           <div v-if="periodType !== 'custom'" class="flex items-center justify-between gap-3 py-3 animate-in slide-in-from-top-2 duration-150">
             <label class="text-xs font-normal text-slate-600 shrink-0">Ulangi Setiap (Siklus)</label>
             <div class="flex items-center gap-2">
-              <button type="button" @click="periodMultiplier > 1 ? periodMultiplier-- : null"
-                class="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all text-slate-700 text-xs font-black cursor-pointer select-none">
+              <SketchButton type="button" @click="periodMultiplier > 1 ? periodMultiplier-- : null"
+                class="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all text-slate-700 text-xs font-black cursor-pointer select-none">
                 -
-              </button>
+              </SketchButton>
               <span class="text-xs font-normal text-slate-800 min-w-[70px] text-center">
                 {{ periodMultiplier }} {{ periodType === 'daily' ? 'Hari' : periodType === 'weekly' ? 'Minggu' : periodType === 'monthly' ? 'Bulan' : 'Tahun' }}
               </span>
-              <button type="button" @click="periodMultiplier++"
-                class="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all text-slate-700 text-xs font-black cursor-pointer select-none">
+              <SketchButton type="button" @click="periodMultiplier++"
+                class="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all text-slate-700 text-xs font-black cursor-pointer select-none">
                 +
-              </button>
+              </SketchButton>
             </div>
           </div>
 
@@ -822,10 +836,7 @@ onMounted(async () => {
           <!-- Permanent Budget -->
           <div v-if="periodType !== 'custom'" class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Budget Permanen Berulang</label>
-            <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
-              <input type="checkbox" v-model="isPermanent" class="sr-only peer" />
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
-            </label>
+            <SketchSwitch v-model="isPermanent" class="shrink-0" />
           </div>
 
           <!-- End Date -->
@@ -841,26 +852,20 @@ onMounted(async () => {
           <!-- Dashboard Widget Switcher -->
           <div class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Tampilkan di Dashboard</label>
-            <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
-              <input type="checkbox" v-model="showOnDashboard" class="sr-only peer" />
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
-            </label>
+            <SketchSwitch v-model="showOnDashboard" class="shrink-0" />
           </div>
 
           <!-- Notification threshold switcher -->
           <div class="flex items-center justify-between gap-3 py-3">
             <label class="text-xs font-normal text-slate-600 shrink-0">Notifikasi Dekat Limit</label>
-            <label class="relative inline-flex items-center cursor-pointer select-none shrink-0">
-              <input type="checkbox" v-model="notifyOnThreshold" class="sr-only peer" />
-              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
-            </label>
+            <SketchSwitch v-model="notifyOnThreshold" class="shrink-0" />
           </div>
 
           <!-- Input notification percentage -->
           <div v-if="notifyOnThreshold" class="flex items-center justify-between gap-3 py-3 animate-in slide-in-from-top-2 duration-150">
             <label class="text-xs font-normal text-slate-600 shrink-0">Batas Threshold (%)</label>
-            <input v-model="notifyThresholdPercent" type="number" min="1" max="100"
-              class="px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-transparent text-right w-20" />
+            <SketchInput v-model="notifyThresholdPercent" type="number" min="1" max="100"
+              class="px-3.5 py-2 text-xs text-right w-20" />
           </div>
 
           <!-- Catatan input (Placed at the very bottom) -->
@@ -870,40 +875,41 @@ onMounted(async () => {
               class="py-1 border-none focus:ring-0 text-xs focus:outline-none bg-transparent text-right w-56 truncate px-0" />
           </div>
 
-        </div>
+        </SketchCard>
       </div>
 
       <footer class="p-3 border-t border-slate-100 bg-slate-50 flex gap-2">
-        <button type="button" @click="showFormModal = false" class="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-xs cursor-pointer text-center">
+        <SketchButton type="button" @click="showFormModal = false" class="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-xs cursor-pointer text-center">
           Batal
-        </button>
-        <button type="button" @click="handleSaveBudget" class="flex-1 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer text-center">
+        </SketchButton>
+        <SketchButton type="button" @click="handleSaveBudget" class="flex-1 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer text-center">
           Simpan
-        </button>
+        </SketchButton>
       </footer>
 
       <!-- FULL PAGE ICON SELECTOR -->
       <div v-if="showIconPage" class="fixed inset-0 z-[60] bg-slate-50 flex flex-col w-full max-w-md mx-auto animate-in slide-in-from-right duration-200">
         <header class="p-4 border-b border-slate-100 bg-white flex items-center gap-3 sticky top-0 z-10">
           <button type="button" @click="showIconPage = false" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600">
-            <PhArrowLeft :size="20" weight="bold" />
+            <PhArrowLeft :size="20" />
           </button>
           <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Pilih Ikon Budget</h3>
         </header>
         <div class="p-4 bg-white border-b border-slate-100">
           <div class="relative">
-            <input v-model="searchIconQuery" type="text" placeholder="Cari ikon..."
-              class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 focus:outline-none focus:border-accent" />
+            <SketchInput v-model="searchIconQuery" type="text" placeholder="Cari ikon..."
+              class="w-full pl-9 pr-4 py-2 text-xs" />
             <PhMagnifyingGlass class="absolute left-3 top-2.5 text-slate-400" :size="14" />
           </div>
         </div>
         <div class="flex-1 overflow-y-auto p-4">
           <div class="grid grid-cols-4 gap-3">
-            <button v-for="ic in filteredIcons" :key="ic.name" type="button" @click="selectIcon(ic.name)"
-              class="bg-white border border-slate-200/60 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:bg-accent-light hover:text-accent hover:border-accent/15 transition-all aspect-square active:scale-95">
+            <SketchBox v-for="ic in filteredIcons" :key="ic.name" @click="selectIcon(ic.name)"
+              class="bg-white p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:bg-accent-light hover:text-accent transition-all aspect-square active:scale-95"
+              :title="ic.label">
               <component :is="resolveIcon(ic.name)" :size="26" />
               <span class="text-[8px] font-bold text-slate-400 truncate w-full text-center">{{ ic.label }}</span>
-            </button>
+            </SketchBox>
           </div>
         </div>
       </div>
@@ -914,14 +920,14 @@ onMounted(async () => {
       <div v-if="showWalletPage" class="fixed inset-0 z-[60] bg-slate-50 flex flex-col w-full max-w-md mx-auto animate-in slide-in-from-right duration-200">
         <header class="p-4 border-b border-slate-100 bg-white flex items-center gap-3 sticky top-0 z-10">
           <button type="button" @click="showWalletPage = false" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600">
-            <PhArrowLeft :size="20" weight="bold" />
+            <PhArrowLeft :size="20" />
           </button>
           <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Pilih Dompet</h3>
         </header>
         <div class="flex-1 overflow-y-auto p-4 space-y-2.5">
-          <div v-for="w in liquidWallets" :key="w.id" @click="walletId = w.id; showWalletPage = false"
-            class="bg-white border rounded-2xl p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-all active:scale-[0.99]"
-            :class="parseInt(walletId) === w.id ? 'border-accent bg-accent/5 shadow-3xs' : 'border-slate-200/60 bg-white'">
+          <SketchBox v-for="w in liquidWallets" :key="w.id" @click="walletId = w.id; showWalletPage = false"
+            class="bg-white p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-all active:scale-[0.99]"
+            :class="parseInt(walletId) === w.id ? 'bg-accent/5' : 'bg-white'">
             <div class="flex items-center gap-3 min-w-0">
               <div class="w-11 h-11 rounded-xl bg-accent-light text-accent flex items-center justify-center text-lg shrink-0">
                 <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="24" />
@@ -934,9 +940,9 @@ onMounted(async () => {
             </div>
             <div class="w-5 h-5 rounded-full border flex items-center justify-center shrink-0"
               :class="parseInt(walletId) === w.id ? 'bg-accent border-accent text-white' : 'border-slate-300 bg-white'">
-              <PhCheck v-if="parseInt(walletId) === w.id" :size="12" weight="bold" />
+              <PhCheck v-if="parseInt(walletId) === w.id" :size="12" />
             </div>
-          </div>
+          </SketchBox>
         </div>
       </div>
 
@@ -945,36 +951,36 @@ onMounted(async () => {
         <header class="p-4 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-10">
           <div class="flex items-center gap-3">
             <button type="button" @click="showCategoryPage = false" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600">
-              <PhArrowLeft :size="20" weight="bold" />
+              <PhArrowLeft :size="20" />
             </button>
             <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Pilih Kategori</h3>
           </div>
-          <button type="button" @click="showCategoryPage = false"
+          <SketchButton type="button" @click="showCategoryPage = false"
             class="px-4 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer">
             Selesai
-          </button>
+          </SketchButton>
         </header>
         <div class="p-4 bg-white border-b border-slate-100">
           <div class="relative">
-            <input v-model="searchCategoryQuery" type="text" placeholder="Cari kategori..."
-              class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 focus:outline-none focus:border-accent" />
+            <SketchInput v-model="searchCategoryQuery" type="text" placeholder="Cari kategori..."
+              class="w-full pl-9 pr-4 py-2 text-xs" />
             <PhMagnifyingGlass class="absolute left-3 top-2.5 text-slate-400" :size="14" />
           </div>
         </div>
         <div class="flex-1 overflow-y-auto p-4">
           <div class="grid grid-cols-4 gap-2">
-            <button v-for="c in filteredExpenseCategories" :key="c.id" type="button" @click="toggleCategorySelection(c.id)"
-              class="bg-white border rounded-xl p-2.5 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50/50 transition-all active:scale-[0.98] relative w-full aspect-square gap-1 select-none"
-              :class="selectedCategoryIds.includes(c.id) ? 'border-accent bg-accent/5 ring-1 ring-accent' : 'border-slate-200/60 bg-white'">
+            <SketchBox v-for="c in filteredExpenseCategories" :key="c.id" @click="toggleCategorySelection(c.id)"
+              class="bg-white p-2.5 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50/50 transition-all active:scale-[0.98] relative w-full aspect-square gap-1 select-none"
+              :class="selectedCategoryIds.includes(c.id) ? 'bg-accent/5 ring-1 ring-accent' : 'bg-white'">
               <span class="text-xl shrink-0 flex items-center justify-center text-slate-600">
                 <component :is="resolveIcon(c.icon)" v-if="resolveIcon(c.icon)" :size="22" />
                 <span v-else>{{ c.icon || '📁' }}</span>
               </span>
               <span class="text-[10px] truncate leading-tight w-full text-slate-800">{{ c.category_name }}</span>
               <div v-if="selectedCategoryIds.includes(c.id)" class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent text-white flex items-center justify-center">
-                <PhCheck :size="10" weight="bold" />
+                <PhCheck :size="10" />
               </div>
-            </button>
+            </SketchBox>
           </div>
         </div>
       </div>
@@ -994,6 +1000,17 @@ onMounted(async () => {
       cancel-text="Batal"
       @confirm="confirmDelete"
       @cancel="showDeleteConfirm = false; transactionToDelete = null"
+    />
+
+    <!-- DELETE BUDGET CONFIRMATION MODAL -->
+    <ConfirmDeleteModal
+      v-model:show="showBudgetDeleteConfirm"
+      title="Konfirmasi Hapus"
+      message="Apakah Anda yakin ingin menghapus anggaran ini? Tindakan ini tidak dapat dibatalkan."
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmBudgetDelete"
+      @cancel="showBudgetDeleteConfirm = false"
     />
     </div>
   </div>

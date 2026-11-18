@@ -1,9 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { api, showToast } from '../api';
-import { PhX, PhPencil, PhTrash } from "@phosphor-icons/vue";
+import { PhX, PhPencil, PhTrash } from "../utils/icons";
 import { resolveIcon, formatRp } from '../utils/helpers';
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue';
+import SketchButton from './SketchButton.vue';
+import SketchBox from './SketchBox.vue';
 
 const props = defineProps({
   transaction: {
@@ -60,8 +62,8 @@ const confirmDelete = async () => {
   <div
     class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150"
     @click.self="$emit('close')">
-    <div
-      class="w-full max-w-sm bg-white rounded-xl p-5 shadow-2xl border border-slate-100 space-y-1 relative z-10 overflow-hidden">
+    <SketchBox
+      class="w-full max-w-sm bg-white p-5 space-y-1 relative z-10 overflow-hidden">
 
       <div class="flex items-center justify-between">
         <button @click="$emit('close')"
@@ -69,14 +71,14 @@ const confirmDelete = async () => {
           <PhX :size="24" />
         </button>
         <div class="flex items-center gap-5">
-          <button type="button" @click="$emit('edit')" :disabled="loading"
+          <SketchButton type="button" @click="$emit('edit')" :disabled="loading"
             class="w-8 h-8 flex items-center justify-center transition-colors text-xs" title="Edit Transaksi">
             <PhPencil :size="24" />
-          </button>
-          <button type="button" @click="triggerDelete" :disabled="loading"
+          </SketchButton>
+          <SketchButton type="button" @click="triggerDelete" :disabled="loading"
             class="w-8 h-8 flex items-center justify-center transition-colors text-xs" title="Hapus Transaksi">
             <PhTrash :size="24" />
-          </button>
+          </SketchButton>
         </div>
       </div>
 
@@ -136,7 +138,7 @@ const confirmDelete = async () => {
         @cancel="showDeleteConfirm = false"
       />
 
-    </div>
+    </SketchBox>
   </div>
 </template>
 

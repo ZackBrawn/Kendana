@@ -1,14 +1,18 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted, watch, nextTick } from 'vue';
 import { api, showToast } from '../api';
-import { PhArrowLeft, PhWarning, PhCaretDown, PhEye, PhEyeSlash, PhPencilSimple } from "@phosphor-icons/vue";
+import { PhArrowLeft, PhWarning, PhCaretDown, PhEye, PhEyeSlash, PhPencilSimple } from "../utils/icons";
 import { WALLET_ICONS } from '../utils/iconList';
-import { Chart, registerables } from 'chart.js';
+import RoughChart from '../components/RoughChart.vue';
 import { formatRp, resolveIcon, groupTransactionsByDate, formatGroupDate } from '../utils/helpers';
 import Transaction from '../components/Transaction.vue';
+import SketchCard from '../components/SketchCard.vue';
+import SketchDivider from '../components/SketchDivider.vue';
+import SketchTabs from '../components/SketchTabs.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
-
-Chart.register(...registerables);
+import SketchButton from '../components/SketchButton.vue';
+import SketchInput from '../components/SketchInput.vue';
+import SketchBox from '../components/SketchBox.vue';
 
 const wallets = ref([]);
 const showAddModal = ref(false);
@@ -149,10 +153,15 @@ const handleUpdateWallet = async () => {
   }
 };
 
-const handleDeleteWallet = async () => {
-  if (!confirm('Apakah Anda yakin ingin menghapus dompet ini? Semua transaksi terkait dompet ini akan terhapus.')) {
-    return;
-  }
+const showWalletDeleteConfirm = ref(false);
+
+const handleDeleteWallet = () => {
+  showWalletDeleteConfirm.value = true;
+};
+
+const confirmWalletDelete = async () => {
+  showWalletDeleteConfirm.value = false;
+  if (!editingWallet.value) return;
   try {
     await api.deleteWallet(editingWallet.value.id);
     showToast('Dompet berhasil dihapus', 'success');
@@ -244,8 +253,8 @@ const netAssets = computed(() => {
 });
 
 const transactions = ref([]);
-const netLineChartCanvas = ref(null);
-let netChartInstance = null;
+// Sparkline rough (RoughChart reaktif terhadap data & warna)
+const netChartColor = computed(() => (netAssets.value >= 0 ? '#34d399' : '#fb7185'));
 
 const netTrendData = computed(() => {
   if (!transactions.value || transactions.value.length === 0) {
@@ -279,50 +288,6 @@ const netTrendData = computed(() => {
   }
 
   return trend;
-});
-
-const updateNetChart = () => {
-  if (netLineChartCanvas.value) {
-    if (netChartInstance) {
-      netChartInstance.destroy();
-    }
-    
-    const isPositive = netAssets.value >= 0;
-    const lineColor = isPositive ? '#34d399' : '#fb7185';
-    const fillColor = isPositive ? 'rgba(52, 211, 153, 0.08)' : 'rgba(251, 113, 133, 0.08)';
-
-    netChartInstance = new Chart(netLineChartCanvas.value, {
-      type: 'line',
-      data: {
-        labels: netTrendData.value.map((_, i) => i),
-        datasets: [{
-          data: netTrendData.value,
-          borderColor: lineColor,
-          borderWidth: 1.8,
-          pointRadius: 0,
-          tension: 0.4,
-          fill: true,
-          backgroundColor: fillColor
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false }
-        },
-        scales: {
-          x: { display: false },
-          y: { display: false }
-        }
-      }
-    });
-  }
-};
-
-watch([netTrendData, netAssets], () => {
-  nextTick(updateNetChart);
 });
 
 const loadTransactions = async () => {
@@ -447,21 +412,16 @@ const handleReload = async () => {
   if (selectedWallet.value) {
     openWalletDetails(selectedWallet.value);
   }
-  nextTick(updateNetChart);
 };
 
 onMounted(async () => {
   await loadWallets();
   await loadTransactions();
   window.addEventListener('reload-data', handleReload);
-  nextTick(updateNetChart);
 });
 
 onUnmounted(() => {
   window.removeEventListener('reload-data', handleReload);
-  if (netChartInstance) {
-    netChartInstance.destroy();
-  }
 });
 </script>
 
@@ -469,13 +429,13 @@ onUnmounted(() => {
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Aset & Dompet</h2>
-      <button @click="showAddModal = true"
+      <SketchButton @click="showAddModal = true"
         class="px-3 py-1.5 bg-accent text-white rounded-xl text-xs font-bold shadow-xs">
         + Tambah Dompet
-      </button>
+      </SketchButton>
     </div>
 
-    <div class="relative overflow-hidden bg-accent text-white rounded-2xl p-4 shadow-lg space-y-3.5">
+    <SketchCard class="relative overflow-hidden bg-accent text-white p-4 space-y-3.5">
       <div class="relative z-10">
         <div class="flex items-start justify-between">
           <div>
@@ -503,37 +463,24 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Line chart container on the right side as background accent -->
+      <!-- Line chart rough sebagai aksen background -->
       <div class="absolute right-0 top-[40%] -translate-y-1/2 w-[45%] h-[55%] opacity-35 pointer-events-none pr-3 z-0">
-        <canvas ref="netLineChartCanvas"></canvas>
-        <div class="absolute inset-y-0 left-0 w-20 pointer-events-none" style="background: linear-gradient(to right, var(--color-primary) 0%, transparent 100%)"></div>
+        <RoughChart type="spark" filled :data="netTrendData" :color="netChartColor" />
+        <div class="absolute inset-y-0 left-0 w-20 pointer-events-none" style="background: linear-gradient(to right, var(--accent) 0%, transparent 100%)"></div>
       </div>
-    </div>
+    </SketchCard>
 
     <div class="flex justify-center shrink-0 mt-4 mb-2">
-      <div class="flex p-0.5 bg-slate-200 border border-slate-200/50 rounded-xl relative w-56 select-none shadow-2xs">
-        <div
-          class="absolute top-0.5 bottom-0.5 left-0.5 bg-white rounded-lg shadow-sm transition-transform duration-250 ease-out w-[calc(50%-2px)]"
-          :class="activeWalletTab === 'settings' ? 'translate-x-full' : 'translate-x-0'"></div>
-
-        <button type="button" @click="activeWalletTab = 'list'"
-          class="flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold transition-colors duration-200 z-10 animate-none"
-          :class="activeWalletTab === 'list' ? 'text-accent font-black' : 'text-slate-500'">
-          Dompet
-        </button>
-
-        <button type="button" @click="activeWalletTab = 'settings'"
-          class="flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold transition-colors duration-200 z-10 animate-none"
-          :class="activeWalletTab === 'settings' ? 'text-accent font-black' : 'text-slate-500'">
-          Pengaturan
-        </button>
-      </div>
+      <SketchTabs v-model="activeWalletTab" class="w-56" :tabs="[
+        { value: 'list', label: 'Dompet' },
+        { value: 'settings', label: 'Pengaturan' }
+      ]" />
     </div>
 
     <div class="flex-1 min-h-0">
       <div v-if="activeWalletTab === 'list'" class="space-y-2">
-        <div v-for="w in liquidWallets" :key="w.id" @click="openWalletDetails(w)"
-          class="bg-white rounded-2xl p-2 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-50/50 transition-colors animate-in fade-in duration-150">
+        <SketchBox v-for="w in liquidWallets" :key="w.id" @click="openWalletDetails(w)"
+          class="bg-white p-2 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors animate-in fade-in duration-150">
           <div class="flex items-center gap-2 flex-1 min-w-0">
             <div
               class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 text-accent">
@@ -548,14 +495,14 @@ onUnmounted(() => {
           <p class="text-xs font-black text-slate-900 shrink-0 pl-2">
             {{ hideValues ? 'Rp ***' : formatRp(w.balance) }}
           </p>
-        </div>
+        </SketchBox>
       </div>
 
       <TransitionGroup name="list" tag="div" v-else class="space-y-2">
-        <div v-for="(w, idx) in liquidWallets" :key="w.id" draggable="true" @dragstart="dragStartWallet(idx)"
+        <SketchBox v-for="(w, idx) in liquidWallets" :key="w.id" draggable="true" @dragstart="dragStartWallet(idx)"
           @dragover.prevent="dragOverWallet(idx, $event)" @dragend="dragEndWallet" @click="openEditWallet(w)"
-          class="bg-white rounded-2xl p-2 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-50/50 transition-colors"
-          :class="draggedWalletIdx === idx ? 'opacity-40 scale-[0.98] border-accent/40 bg-accent-light' : 'border-transparent hover:border-accent/40'">
+          class="bg-white p-2 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors"
+          :class="draggedWalletIdx === idx ? 'opacity-40 scale-[0.98] bg-accent-light' : ''">
           <div class="flex items-center gap-2 flex-1 min-w-0">
             <div
               class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 text-accent">
@@ -572,7 +519,7 @@ onUnmounted(() => {
             <span @click.stop
               class="text-slate-400 cursor-grab active:cursor-grabbing font-black text-xs select-none p-1.5 hover:text-slate-600 transition-colors">☰</span>
           </div>
-        </div>
+        </SketchBox>
       </TransitionGroup>
     </div>
 
@@ -584,7 +531,7 @@ onUnmounted(() => {
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showAddModal = false"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-            <PhArrowLeft :size="24" weight="bold"/>
+            <PhArrowLeft :size="24"/>
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Tambah Dompet</h3>
           <div class="w-12"></div>
@@ -593,37 +540,37 @@ onUnmounted(() => {
         <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-20">
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Nama Dompet</label>
-            <input v-model="name" type="text" placeholder="Nama Dompet (cth: Bank BCA)"
-              class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
+            <SketchInput v-model="name" type="text" placeholder="Nama Dompet (cth: Bank BCA)"
+              class="w-full text-xs px-3.5 py-2.5 font-bold text-slate-800" />
           </div>
 
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Saldo Awal</label>
-            <input v-model="balanceDisplay" type="text" placeholder="0"
-              class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
+            <SketchInput v-model="balanceDisplay" type="text" placeholder="0"
+              class="w-full text-xs px-3.5 py-2.5 font-bold text-slate-800" />
           </div>
 
           <div class="space-y-1.5 flex-1 flex flex-col min-h-0">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Pilih Icon Dompet</label>
-            <div class="flex-1 overflow-y-auto p-3 bg-white border border-slate-200 rounded-2xl space-y-4 no-scrollbar">
+            <SketchBox class="flex-1 overflow-y-auto p-3 bg-white space-y-4 no-scrollbar">
               <div class="grid grid-cols-4 gap-2">
-                <button v-for="ico in WALLET_ICONS" :key="ico.name" type="button" @click="icon = ico.name"
-                  class="aspect-square rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all hover:bg-slate-100 border border-slate-100 shrink-0 cursor-pointer"
-                  :class="icon === ico.name ? 'bg-accent-light border-accent text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
+                <SketchBox v-for="ico in WALLET_ICONS" :key="ico.name" @click="icon = ico.name"
+                  class="aspect-square flex flex-col items-center justify-center gap-1.5 transition-all hover:bg-slate-100 shrink-0 cursor-pointer"
+                  :class="icon === ico.name ? 'bg-accent-light text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
                   :title="ico.label">
                   <component :is="resolveIcon(ico.name)" :size="52" />
                   <span class="text-[8px] font-bold text-slate-500 truncate max-w-full px-1">{{ ico.label }}</span>
-                </button>
+                </SketchBox>
               </div>
-            </div>
+            </SketchBox>
           </div>
         </div>
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
-          <button @click="handleCreate"
+          <SketchButton @click="handleCreate"
             class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 cursor-pointer">
             Simpan Dompet
-          </button>
+          </SketchButton>
         </div>
       </div>
     </Teleport>
@@ -636,19 +583,19 @@ onUnmounted(() => {
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showDetailModal = false; selectedWallet = null"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-            <PhArrowLeft :size="24" weight="bold"/>
+            <PhArrowLeft :size="24"/>
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Detail Dompet</h3>
           <button @click="openEditWallet(selectedWallet)"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer"
             title="Edit Dompet">
-            <PhPencilSimple :size="24" weight="bold"/>
+            <PhPencilSimple :size="24"/>
           </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-20">
 
-          <div class="relative overflow-hidden rounded-2xl bg-accent p-3 text-white shadow-lg">
+          <SketchBox class="relative overflow-hidden bg-accent p-3 text-white">
             <div class="relative z-10 flex items-center justify-between">
               <div>
                 <p class="text-[10px] text-white/80 font-extrabold uppercase tracking-wider">Saldo Terkini</p>
@@ -667,35 +614,23 @@ onUnmounted(() => {
                 {{ selectedWallet.name }}
               </span>
             </div>
-          </div>
+          </SketchBox>
 
           <div class="flex justify-center shrink-0 pt-2">
-            <div
-              class="flex p-0.5 bg-slate-200 border border-slate-200/50 rounded-xl relative w-56 select-none shadow-2xs">
-              <div
-                class="absolute top-0.5 bottom-0.5 left-0.5 bg-white rounded-lg shadow-sm transition-transform duration-250 ease-out w-[calc(50%-2px)]"
-                :class="detailTab === 'history' ? 'translate-x-full' : 'translate-x-0'"></div>
-              <button @click="detailTab = 'summary'"
-                class="flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold transition-colors duration-200 z-10 cursor-pointer"
-                :class="detailTab === 'summary' ? 'text-accent' : 'text-slate-400'">
-                Rangkuman
-              </button>
-              <button @click="detailTab = 'history'"
-                class="flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold transition-colors duration-200 z-10 cursor-pointer"
-                :class="detailTab === 'history' ? 'text-accent' : 'text-slate-400'">
-                Riwayat
-              </button>
-            </div>
+            <SketchTabs v-model="detailTab" class="w-56" :tabs="[
+              { value: 'summary', label: 'Rangkuman' },
+              { value: 'history', label: 'Riwayat' }
+            ]" />
           </div>
 
           <div v-if="loadingTransactions" class="animate-pulse space-y-3 py-6">
-            <div class="h-10 bg-slate-200 rounded-xl"></div>
-            <div class="h-20 bg-slate-200 rounded-xl"></div>
+            <SketchBox class="h-10 bg-slate-200"></SketchBox>
+            <SketchBox class="h-20 bg-slate-200"></SketchBox>
           </div>
 
           <template v-else>
             <div v-if="detailTab === 'summary'" class="space-y-4 animate-in fade-in duration-200">
-              <div class="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-xs">
+              <SketchBox class="bg-white p-4 space-y-3">
                 <h5 class="text-[10px] font-black text-rose-500 uppercase tracking-wider flex items-center gap-1.5">
                   Pengeluaran per Kategori
                 </h5>
@@ -716,9 +651,9 @@ onUnmounted(() => {
                     <span class="text-xs font-extrabold text-rose-500">-{{ formatRp(item.amount) }}</span>
                   </div>
                 </div>
-              </div>
+              </SketchBox>
 
-              <div class="bg-white border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-xs">
+              <SketchBox class="bg-white p-4 space-y-3">
                 <h5 class="text-[10px] font-black text-emerald-500 uppercase tracking-wider flex items-center gap-1.5">
                   Pemasukan per Kategori
                 </h5>
@@ -739,28 +674,30 @@ onUnmounted(() => {
                     <span class="text-xs font-extrabold text-emerald-600">+{{ formatRp(item.amount) }}</span>
                   </div>
                 </div>
-              </div>
+              </SketchBox>
             </div>
 
             <div v-else class="space-y-3 animate-in fade-in duration-200">
-              <div v-if="walletGroupedTransactions.length === 0"
-                class="bg-white border border-slate-200/80 rounded-2xl p-6 text-center text-slate-400 text-xs font-medium">
+              <SketchBox v-if="walletGroupedTransactions.length === 0"
+                class="bg-white p-6 text-center text-slate-400 text-xs font-medium">
                 Belum ada riwayat transaksi.
-              </div>
+              </SketchBox>
 
-              <div v-else v-for="group in walletGroupedTransactions" :key="group.date" class="mb-3 last:mb-0">
+              <SketchCard v-else v-for="group in walletGroupedTransactions" :key="group.date" class="mb-3 last:mb-0">
                 <div @click="toggleGroup(group.date)"
                   class="flex items-center justify-between cursor-pointer select-none px-3.5 py-2 bg-slate-100 border border-slate-200/50 hover:bg-slate-200/50 transition-all"
-                  :class="isCollapsed(group.date) ? 'rounded-xl' : 'rounded-t-xl border-b-0'">
+                  :class="isCollapsed(group.date) ? '' : 'border-b-0'">
                   <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     {{ formatGroupDateLabel(group.date) }}
                   </span>
-                  <PhCaretDown :size="14" weight="bold" class="text-slate-400 transition-transform duration-200"
+                  <PhCaretDown :size="14" class="text-slate-400 transition-transform duration-200"
                     :class="{ '-rotate-90': isCollapsed(group.date) }" />
                 </div>
 
+                <SketchDivider />
+
                 <div v-show="!isCollapsed(group.date)"
-                  class="bg-white border border-slate-200/80 rounded-b-2xl rounded-t-none divide-y divide-slate-100 shadow-xs overflow-hidden">
+                  class="bg-white divide-y divide-slate-100 overflow-hidden">
                   <Transaction
                     v-for="t in group.transactions"
                     :key="t.id"
@@ -771,13 +708,13 @@ onUnmounted(() => {
                     @delete="handleSwipeDelete"
                   />
                 </div>
-              </div>
+              </SketchCard>
               
               <div v-if="pagination.page < pagination.pages" class="pt-2 flex justify-center">
-                <button @click="loadMoreTransactions" 
+                <SketchButton @click="loadMoreTransactions"
                   class="px-4 py-2 text-center text-[10px] font-black uppercase bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl cursor-pointer">
                   Muat Lebih Banyak
-                </button>
+                </SketchButton>
               </div>
             </div>
           </template>
@@ -796,6 +733,17 @@ onUnmounted(() => {
       @cancel="showDeleteConfirm = false; transactionToDelete = null"
     />
 
+    <!-- Wallet Delete Confirm Modal -->
+    <ConfirmDeleteModal
+      v-model:show="showWalletDeleteConfirm"
+      title="Konfirmasi Hapus"
+      message="Apakah Anda yakin ingin menghapus dompet ini? Semua transaksi terkait dompet ini akan terhapus."
+      confirm-text="Ya, Hapus"
+      cancel-text="Batal"
+      @confirm="confirmWalletDelete"
+      @cancel="showWalletDeleteConfirm = false"
+    />
+
     <!-- Edit Wallet Modal Sheet -->
     <Teleport to="body">
       <div v-if="showEditWalletSheet"
@@ -804,7 +752,7 @@ onUnmounted(() => {
           class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
           <button @click="showEditWalletSheet = false"
             class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-            <PhArrowLeft :size="24" weight="bold"/>
+            <PhArrowLeft :size="24"/>
           </button>
           <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Ubah Dompet</h3>
           <button @click="handleDeleteWallet"
@@ -814,38 +762,38 @@ onUnmounted(() => {
         <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-20">
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Nama Dompet</label>
-            <input v-model="editWalletName" type="text" placeholder="Nama Dompet (cth: Bank BCA)"
-              class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
+            <SketchInput v-model="editWalletName" type="text" placeholder="Nama Dompet (cth: Bank BCA)"
+              class="w-full text-xs px-3.5 py-2.5 font-bold text-slate-800" />
           </div>
 
           <div class="space-y-1.5">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Saldo</label>
-            <input v-model="editWalletBalanceDisplay" type="text" placeholder="0"
-              class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-accent font-bold text-slate-800" />
+            <SketchInput v-model="editWalletBalanceDisplay" type="text" placeholder="0"
+              class="w-full text-xs px-3.5 py-2.5 font-bold text-slate-800" />
           </div>
 
 
           <div class="space-y-1.5 flex-1 flex flex-col min-h-0">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Pilih Icon Dompet</label>
-            <div class="flex-1 overflow-y-auto p-3 bg-white border border-slate-200 rounded-2xl space-y-4 no-scrollbar">
+            <SketchBox class="flex-1 overflow-y-auto p-3 bg-white space-y-4 no-scrollbar">
               <div class="grid grid-cols-4 gap-2">
-                <button v-for="ico in WALLET_ICONS" :key="ico.name" type="button" @click="editWalletIcon = ico.name"
-                  class="aspect-square rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all hover:bg-slate-100 border border-slate-100 shrink-0 cursor-pointer"
-                  :class="editWalletIcon === ico.name ? 'bg-accent-light border-accent text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
+                <SketchBox v-for="ico in WALLET_ICONS" :key="ico.name" @click="editWalletIcon = ico.name"
+                  class="aspect-square flex flex-col items-center justify-center gap-1.5 transition-all hover:bg-slate-100 shrink-0 cursor-pointer"
+                  :class="editWalletIcon === ico.name ? 'bg-accent-light text-accent ring-2 ring-accent' : 'text-slate-600 bg-slate-50/50'"
                   :title="ico.label">
                   <component :is="resolveIcon(ico.name)" :size="52" />
                   <span class="text-[8px] font-bold text-slate-500 truncate max-w-full px-1">{{ ico.label }}</span>
-                </button>
+                </SketchBox>
               </div>
-            </div>
+            </SketchBox>
           </div>
         </div>
 
         <div class="p-4 bg-white border-t border-slate-200 shrink-0">
-          <button @click="handleUpdateWallet"
+          <SketchButton @click="handleUpdateWallet"
             class="w-full py-3 bg-accent text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-accent/25 cursor-pointer">
             Simpan Perubahan
-          </button>
+          </SketchButton>
         </div>
       </div>
     </Teleport>

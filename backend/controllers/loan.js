@@ -7,6 +7,7 @@ exports.getLoans = async (req, res) => {
     const logs = await prisma.transactionLog.findMany({
       where: {
         user_id: req.user.id,
+        deleted_at: null,
         type: { name: typeName }
       },
       include: {
@@ -37,6 +38,7 @@ exports.getSubjects = async (req, res) => {
     const subjects = await prisma.transactionLog.findMany({
       where: {
         user_id: req.user.id,
+        deleted_at: null,
         type: { name: typeName },
         subject: { not: '-' }
       },

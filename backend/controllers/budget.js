@@ -109,7 +109,10 @@ async function getBudgetSpentAndTransactions(budget, today = new Date()) {
   let categoryFilter = {};
   if (budget.category_scope === 'specific') {
     const relations = await prisma.budgetCategory.findMany({
-      where: { budget_id: budget.id },
+      where: {
+        budget_id: budget.id,
+        category: { is: { is_active: true, deleted_at: null } }
+      },
       select: { category_id: true }
     });
     const categoryIds = relations.map(r => r.category_id);
@@ -123,6 +126,7 @@ async function getBudgetSpentAndTransactions(budget, today = new Date()) {
     where: {
       user_id: budget.user_id,
       type_id: 2, // Expense
+      deleted_at: null,
       date: {
         gte: cycle.start,
         lte: cycle.end
@@ -224,7 +228,7 @@ const validateBudgetInput = async (userId, body) => {
       throw new Error('Dompet harus dipilih');
     }
     const wallet = await prisma.wallet.findFirst({
-      where: { id: parseInt(wallet_id), user_id: userId }
+      where: { id: parseInt(wallet_id), user_id: userId, is_active: true, deleted_at: null }
     });
     if (!wallet) {
       throw new Error('Dompet tidak ditemukan atau bukan milik Anda');
@@ -244,7 +248,9 @@ const validateBudgetInput = async (userId, body) => {
       where: {
         id: { in: category_ids.map(id => parseInt(id)) },
         user_id: userId,
-        type_id: 2 // Expense only
+        type_id: 2, // Expense only
+        is_active: true,
+        deleted_at: null
       }
     });
     if (dbCategories.length !== category_ids.length) {
@@ -341,17 +347,20 @@ exports.getBudgets = async (req, res) => {
       const stats = await getBudgetSpentAndTransactions(b, new Date());
       formatted.push({
         ...b,
+        wallet: b.wallet?.is_active && !b.wallet.deleted_at ? b.wallet : null,
         limit_amount: parseFloat(b.limit_amount),
         spent_amount: stats.spent_amount,
         percentage_used: stats.percentage_used,
         current_cycle: stats.current_cycle,
         remaining_days: stats.remaining_days,
         wallet_name: b.wallet?.name,
-        categories: b.categories.map(c => ({
+        categories: b.categories
+          .filter(c => c.category.is_active && !c.category.deleted_at)
+          .map(c => ({
           id: c.category.id,
           name: c.category.category_name,
           icon: c.category.icon
-        }))
+          }))
       });
     }
 
@@ -384,6 +393,7 @@ exports.getBudgetDetail = async (req, res) => {
 
     res.json({
       ...budget,
+      wallet: budget.wallet?.is_active && !budget.wallet.deleted_at ? budget.wallet : null,
       limit_amount: parseFloat(budget.limit_amount),
       spent_amount: stats.spent_amount,
       percentage_used: stats.percentage_used,
@@ -391,11 +401,13 @@ exports.getBudgetDetail = async (req, res) => {
       remaining_days: stats.remaining_days,
       transactions: stats.transactions,
       wallet_name: budget.wallet?.name,
-      categories: budget.categories.map(c => ({
+      categories: budget.categories
+        .filter(c => c.category.is_active && !c.category.deleted_at)
+        .map(c => ({
         id: c.category.id,
         name: c.category.category_name,
         icon: c.category.icon
-      }))
+        }))
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { PhPencil, PhTrash } from '@phosphor-icons/vue';
+import { PhPencil, PhTrash } from '../utils/icons';
+import SketchButton from './SketchButton.vue';
 import { formatRp, resolveIcon } from '../utils/helpers';
 
 const props = defineProps({
@@ -144,15 +145,15 @@ const amountColorClass = (transaction) => {
     <!-- BACKGROUND LAYER (Swipe Actions) -->
     <div class="absolute inset-0 flex justify-end items-stretch z-0 bg-slate-100">
       <!-- Edit Action -->
-      <button type="button" @click.stop="handleEdit"
+      <SketchButton type="button" @click.stop="handleEdit"
         class="w-16 bg-accent text-white flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
         <PhPencil :size="24" />
-      </button>
+      </SketchButton>
       <!-- Delete Action -->
-      <button type="button" @click.stop="handleDelete"
+      <SketchButton type="button" @click.stop="handleDelete"
         class="w-16 bg-rose-500 hover:bg-rose-700 text-white flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer">
         <PhTrash :size="24" />
-      </button>
+      </SketchButton>
     </div>
 
     <!-- FOREGROUND LAYER (Content) -->

@@ -22,7 +22,7 @@ async function generateBudget(userId, month, year) {
 
     // Retrieve categories of type 'Expense' (type_id = 2)
     const categories = await prisma.category.findMany({
-      where: { user_id: userId, type_id: 2 }
+      where: { user_id: userId, type_id: 2, is_active: true, deleted_at: null }
     });
 
     if (categories.length === 0) {
@@ -40,6 +40,7 @@ async function generateBudget(userId, month, year) {
       where: {
         user_id: userId,
         type_id: 2,
+        deleted_at: null,
         date: {
           gte: startDate,
           lte: endDate
@@ -320,6 +321,7 @@ async function getBudgetSummary(budgetGroupId, userId) {
           user_id: userId,
           category_id: item.budgetable_id,
           type_id: 2, // Expense
+          deleted_at: null,
           date: { gte: startOfMonth, lte: endOfMonth }
         }
       });
@@ -343,4 +345,3 @@ module.exports = {
   generateBudget,
   getBudgetSummary
 };
-

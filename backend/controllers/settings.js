@@ -1,6 +1,15 @@
 const bcrypt = require('bcryptjs');
 const { prisma } = require('../config/db');
 const { logChange } = require('../utils/settingsLogger');
+const { ImportValidationError, prepareBendaharakuImport } = require('../services/bendaharakuImport');
+
+const isBendaharakuImportEnabled = () => process.env.KENDANA_DATA_IMPORT_ENABLED === 'true';
+const configuredImportAdminEmail = () => (process.env.KENDANA_DATA_IMPORT_ADMIN_EMAIL || '').trim().toLowerCase();
+
+const isBendaharakuImportAdmin = (user) =>
+  isBendaharakuImportEnabled() &&
+  configuredImportAdminEmail() !== '' &&
+  user.email.toLowerCase() === configuredImportAdminEmail();
 
 // Update profile info
 exports.updateProfile = async (req, res) => {
@@ -98,14 +107,12 @@ exports.updatePreferences = async (req, res) => {
 
 // Update appearance
 exports.updateAppearance = async (req, res) => {
-  const { theme, accent_color, category_icon_colored } = req.body;
+  const { category_icon_colored } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
 
     const updatedData = {};
-    if (theme) updatedData.theme = theme;
-    if (accent_color) updatedData.accent_color = accent_color;
     if (category_icon_colored !== undefined) updatedData.category_icon_colored = category_icon_colored;
 
     const original = { ...user };
@@ -240,6 +247,214 @@ exports.exportAccountData = async (req, res) => {
   }
 };
 
+exports.getBendaharakuImportStatus = async (req, res) => {
+  try {
+    if (!isBendaharakuImportEnabled() || !configuredImportAdminEmail()) {
+      return res.json({ enabled: false });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { email: true }
+    });
+    if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+
+    res.json({ enabled: isBendaharakuImportAdmin(user) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.importBendaharakuData = async (req, res) => {
+  if (!isBendaharakuImportEnabled() || !configuredImportAdminEmail()) {
+    return res.status(403).json({ error: 'Impor data belum diaktifkan di server.' });
+  }
+  if (!req.file) return res.status(400).json({ error: 'Pilih file ekspor JSON terlebih dahulu.' });
+
+  try {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, email: true }
+    });
+    if (!targetUser) return res.status(404).json({ error: 'User tidak ditemukan' });
+    if (!isBendaharakuImportAdmin(targetUser)) {
+      return res.status(403).json({ error: 'Akun ini tidak diizinkan mengimpor data.' });
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(req.file.buffer.toString('utf8'));
+    } catch {
+      return res.status(400).json({ error: 'File bukan JSON yang valid.' });
+    }
+
+    const plan = prepareBendaharakuImport(payload, targetUser);
+    const sourceTransactionClientIds = plan.transactions.map(
+      (transaction) => `bendaharaku:${plan.sourceUser.id}:${transaction.source_id}`
+    );
+    const references = plan.transactions.map((transaction) => transaction.reference_number);
+
+    const result = await prisma.$transaction(async (tx) => {
+      if (references.length > 0) {
+        const collisions = await tx.transactionLog.findMany({
+          where: {
+            OR: [
+              { reference_number: { in: references } },
+              { client_id: { in: sourceTransactionClientIds } }
+            ]
+          },
+          select: { reference_number: true, client_id: true },
+          take: 10
+        });
+        if (collisions.length > 0) {
+          const error = new Error(
+            'Sebagian reference_number sudah ada di Kendana. Tidak ada data yang diimpor.'
+          );
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+
+      const targetTypes = await tx.transactionType.findMany({
+        where: { name: { in: plan.transactionTypeNames } },
+        select: { id: true, name: true }
+      });
+      const targetTypeIdByName = new Map(
+        targetTypes.map((type) => [type.name.toLowerCase(), type.id])
+      );
+      for (const name of plan.transactionTypeNames) {
+        if (!targetTypeIdByName.has(name.toLowerCase())) {
+          const createdType = await tx.transactionType.create({
+            data: { name }
+          });
+          targetTypeIdByName.set(name.toLowerCase(), createdType.id);
+        }
+      }
+
+      const sourceTypeIdToTarget = Object.fromEntries(
+        [...plan.typeNameBySourceId.entries()].map(([sourceId, name]) => [
+          sourceId,
+          targetTypeIdByName.get(name.toLowerCase())
+        ])
+      );
+
+      const walletIdMap = new Map();
+      for (const wallet of plan.wallets) {
+        const createdWallet = await tx.wallet.create({
+          data: {
+            user_id: targetUser.id,
+            name: wallet.name,
+            balance: wallet.balance,
+            group_type: wallet.group_type,
+            icon: wallet.icon,
+            keyword: wallet.keyword,
+            is_active: wallet.is_active,
+            deleted_at: wallet.deleted_at,
+            is_pinned: wallet.is_pinned,
+            account_name: wallet.account_name,
+            account_number: wallet.account_number,
+            bank_code: wallet.bank_code,
+            created_at: wallet.created_at,
+            updated_at: wallet.updated_at
+          },
+          select: { id: true }
+        });
+        walletIdMap.set(wallet.source_id, createdWallet.id);
+      }
+
+      const categoryIdMap = new Map();
+      for (const category of plan.categories) {
+        const createdCategory = await tx.category.create({
+          data: {
+            user_id: targetUser.id,
+            type_id: sourceTypeIdToTarget[category.type_source_id],
+            category_name: category.category_name,
+            icon: category.icon,
+            keyword: category.keyword,
+            is_active: category.is_active,
+            deleted_at: category.deleted_at,
+            system_key: category.system_key,
+            custom_name: category.custom_name,
+            custom_icon: category.custom_icon,
+            custom_keyword: category.custom_keyword,
+            created_at: category.created_at,
+            updated_at: category.updated_at
+          },
+          select: { id: true }
+        });
+        categoryIdMap.set(category.source_id, createdCategory.id);
+      }
+
+      const transactionIdMap = {};
+      for (const [index, transaction] of plan.transactions.entries()) {
+        const createdTransaction = await tx.transactionLog.create({
+          data: {
+            reference_number: transaction.reference_number,
+            user_id: targetUser.id,
+            date: transaction.date,
+            type_id: sourceTypeIdToTarget[transaction.type_source_id],
+            category_id: transaction.category_source_id === null
+              ? null
+              : categoryIdMap.get(transaction.category_source_id),
+            source_wallet_id: walletIdMap.get(transaction.source_wallet_source_id),
+            destination_wallet_id: transaction.destination_wallet_source_id === null
+              ? null
+              : walletIdMap.get(transaction.destination_wallet_source_id),
+            amount: transaction.amount,
+            balance_before: transaction.balance_before,
+            balance_after: transaction.balance_after,
+            subject: transaction.subject,
+            notes: transaction.notes,
+            is_cleared: transaction.is_cleared,
+            deleted_at: transaction.deleted_at,
+            created_at: transaction.created_at,
+            updated_at: transaction.updated_at,
+            due_date: transaction.due_date,
+            due_date_type: transaction.due_date_type,
+            due_date_interval: transaction.due_date_interval,
+            client_id: sourceTransactionClientIds[index]
+          },
+          select: { id: true }
+        });
+        transactionIdMap[transaction.source_id] = createdTransaction.id;
+      }
+
+      return {
+        typeIdMap: sourceTypeIdToTarget,
+        walletIdMap: Object.fromEntries(walletIdMap),
+        categoryIdMap: Object.fromEntries(categoryIdMap),
+        transactionIdMap
+      };
+    }, { maxWait: 10000, timeout: 120000 });
+
+    res.json({
+      success: true,
+      counts: {
+        wallets: plan.wallets.length,
+        categories: plan.categories.length,
+        transactions: plan.transactions.length
+      },
+      id_map: {
+        user: { [plan.sourceUser.id]: targetUser.id },
+        transaction_types: result.typeIdMap,
+        wallets: result.walletIdMap,
+        categories: result.categoryIdMap,
+        transactions: result.transactionIdMap
+      },
+      message: 'Data Bendaharaku berhasil ditambahkan ke akun Kendana.'
+    });
+  } catch (err) {
+    if (err instanceof ImportValidationError) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
+    if (err.statusCode === 409) {
+      return res.status(409).json({ error: err.message });
+    }
+    console.error('Bendaharaku import failed:', err);
+    res.status(500).json({ error: 'Impor gagal dan seluruh perubahan telah dibatalkan.' });
+  }
+};
+
 // Delete account
 exports.deleteAccount = async (req, res) => {
   const { password } = req.body;
@@ -272,10 +487,9 @@ exports.clearCache = async (req, res) => {
 // System About
 exports.getAbout = async (req, res) => {
   res.json({
-    appVersion: '0.3',
+    appVersion: '2.0',
     service: 'express-prisma',
     status: 'ok',
     time: new Date().toISOString()
   });
 };
-

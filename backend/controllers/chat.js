@@ -113,7 +113,12 @@ exports.sendMessage = async (req, res) => {
 
     if (textLower === '/saldo') {
       const wallets = await prisma.wallet.findMany({
-        where: { user_id: userId, group_type: { not: 'System' } }
+        where: {
+          user_id: userId,
+          is_active: true,
+          deleted_at: null,
+          group_type: { not: 'System' }
+        }
       });
       const lines = wallets.map(w => `- *${w.name}*: Rp ${Number(w.balance).toLocaleString('id-ID')}`);
       const reply = `Status saldo aktif:\n${lines.length > 0 ? lines.join('\n') : 'Belum ada dompet terdaftar.'}`;
@@ -229,7 +234,12 @@ exports.wallets = async (req, res) => {
   const userId = req.user.id;
   try {
     const wallets = await prisma.wallet.findMany({
-      where: { user_id: userId, group_type: { not: 'System' } },
+      where: {
+        user_id: userId,
+        is_active: true,
+        deleted_at: null,
+        group_type: { not: 'System' }
+      },
       orderBy: { name: 'asc' }
     });
     res.json({
@@ -259,7 +269,7 @@ exports.assignWallet = async (req, res) => {
     }
 
     const wallet = await prisma.wallet.findFirst({
-      where: { id: parseInt(wallet_id), user_id: userId }
+      where: { id: parseInt(wallet_id), user_id: userId, is_active: true, deleted_at: null }
     });
 
     if (!wallet) {
@@ -401,4 +411,3 @@ exports.cancelTransaction = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-

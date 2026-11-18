@@ -1,5 +1,7 @@
 <script setup>
-import { PhBackspace } from '@phosphor-icons/vue';
+import { PhBackspace } from '../utils/icons';
+import SketchButton from './SketchButton.vue';
+import SketchBox from './SketchBox.vue';
 const emit = defineEmits(['key']);
 
 const keys = [
@@ -19,18 +21,18 @@ const handlePress = (val) => {
 </script>
 
 <template>
-  <div class="grid grid-cols-3 gap-1.5 p-2 bg-slate-100/80 rounded-2xl border border-slate-200/60 shadow-xs">
+  <SketchBox class="grid grid-cols-3 gap-1.5 p-2 bg-slate-100/80">
     <template v-for="(row, rIdx) in keys" :key="rIdx">
-      <button v-for="k in row" :key="k" type="button" @click="handlePress(k)" :class="[
-        'py-3 rounded-xl font-extrabold text-base transition-all active:scale-95 flex items-center justify-center shadow-xs',
+      <SketchButton v-for="k in row" :key="k" type="button" @click="handlePress(k)" :class="[
+        'py-3 font-extrabold text-base transition-all active:scale-95 flex items-center justify-center',
         k === 'backspace'
-          ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200/60'
-          : 'bg-white text-slate-800 hover:bg-slate-50 border border-slate-200/80'
+          ? 'bg-rose-50 text-rose-500 hover:bg-rose-100'
+          : 'bg-white text-slate-800 hover:bg-slate-50'
       ]">
         <PhBackspace v-if="k === 'backspace'" :size="20" />
         <span v-else>{{ k }}</span>
-      </button>
+      </SketchButton>
     </template>
-  </div>
+  </SketchBox>
 </template>
 

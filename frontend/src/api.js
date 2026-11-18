@@ -26,9 +26,20 @@ export async function request(endpoint, options = {}) {
     headers
   });
 
-  const data = await response.json();
+  const responseText = await response.text();
+  let data;
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      if (response.ok) throw new Error('Respons server tidak valid');
+    }
+  } else if (response.ok) {
+    throw new Error('Respons server kosong');
+  }
+
   if (!response.ok) {
-    throw new Error(data.error || 'Terjadi kesalahan pada server');
+    throw new Error(data?.error || `Terjadi kesalahan pada server (${response.status})`);
   }
   return data;
 }
@@ -112,7 +123,32 @@ const getCachedOrRequest = async (cacheKey, endpoint) => {
   }
 };
 
-const getDashboardCached = async () => {
+const getDashboardCached = async (rangeOptions = null) => {
+  const cachedDashboard = () => getCache('dashboard');
+  const cachedFallback = async () => (await cachedDashboard()) || {
+    totalBalance: 0,
+    monthlyIncome: 0,
+    monthlyExpense: 0,
+    wallets: [],
+    recentTransactions: []
+  };
+
+  if (rangeOptions) {
+    if (isOffline()) return cachedFallback();
+    const params = new URLSearchParams({
+      rangeStart: rangeOptions.rangeStart,
+      rangeEnd: rangeOptions.rangeEnd,
+      offset: String(rangeOptions.offset || 0),
+      limit: String(rangeOptions.limit || 50)
+    });
+    try {
+      return await request(`/dashboard?${params}`);
+    } catch (error) {
+      if (!isNetworkError(error)) throw error;
+      return cachedFallback();
+    }
+  }
+
   if (isOffline()) return (await getCache('dashboard')) || { totalBalance: 0, monthlyIncome: 0, monthlyExpense: 0, wallets: [], recentTransactions: [] };
   try {
     const data = await request('/dashboard');
@@ -461,6 +497,12 @@ export const api = {
   getRecentChanges: () => request('/settings/recent-changes'),
   clearCache: () => request('/settings/cache/clear', { method: 'POST' }),
   deleteAccount: (data) => request('/settings/account/delete', { method: 'POST', body: JSON.stringify(data) }),
+  getBendaharakuImportStatus: () => request('/settings/account/import/bendaharaku/status'),
+  importBendaharaku: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/settings/account/import/bendaharaku', { method: 'POST', body: formData });
+  },
   getAbout: () => request('/settings/about'),
   getWalletDetail: (id, params = {}) => request(`/wallets/${id}?${new URLSearchParams(params)}`),
   getCategoryDetail: (id, params = {}) => request(`/categories/${id}?${new URLSearchParams(params)}`),

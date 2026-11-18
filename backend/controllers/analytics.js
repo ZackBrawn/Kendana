@@ -8,6 +8,7 @@ exports.getAnalytics = async (req, res) => {
     const expenseLogs = await prisma.transactionLog.findMany({
       where: {
         user_id: userId,
+        deleted_at: null,
         type: { name: 'Expense' },
         category_id: { not: null }
       },
@@ -28,7 +29,7 @@ exports.getAnalytics = async (req, res) => {
 
     // Fetch monthly trends
     const allLogs = await prisma.transactionLog.findMany({
-      where: { user_id: userId },
+      where: { user_id: userId, deleted_at: null },
       include: { type: true },
       orderBy: { date: 'asc' }
     });
@@ -60,4 +61,3 @@ exports.getAnalytics = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-

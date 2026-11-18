@@ -10,8 +10,10 @@ import {
   PhSparkle, 
   PhWifiSlash,
   PhShieldCheck
-} from "@phosphor-icons/vue";
+} from "../utils/icons";
 import { api } from '../api';
+import SketchCard from './SketchCard.vue';
+import SketchDivider from './SketchDivider.vue';
 
 defineProps({
   show: {
@@ -22,7 +24,7 @@ defineProps({
 
 const emit = defineEmits(['close']);
 
-const version = ref('0.3');
+const version = ref('2.0');
 const serviceType = ref('express-prisma');
 
 // State collapsible sections (default terbuka untuk fitur utama)
@@ -149,7 +151,7 @@ onMounted(() => {
         class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
         <button @click="emit('close')"
           class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-          <PhArrowLeft :size="24" weight="bold"/>
+          <PhArrowLeft :size="24"/>
         </button>
         <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">Tentang Aplikasi</h3>
         <div class="w-8"></div>
@@ -162,30 +164,35 @@ onMounted(() => {
           <p>Kendana v{{ version }} &bull; Service: {{ serviceType }}</p>
           <p>&copy; 2026 ZackBrawn. All Rights Reserved.</p>
         </div>
+        <div>
+          <p class="text-[10px] text-slate-500 leading-relaxed text-center">
+            Aplikasi ini masih dalam tahap pengembangan. Beberapa fitur mungkin belum sempurna atau masih dalam versi beta.
+          </p>
+        </div>
 
         <!-- SECTION 1: Fitur yang BISA dilakukan (Collapsible) -->
-        <div class="shadow-md rounded-2xl overflow-hidden bg-white border border-slate-200/80">
+        <SketchCard class="shadow-md overflow-hidden bg-white">
           <div @click="toggleSection('featuresCan')"
-            class="flex items-center justify-between cursor-pointer select-none px-4 py-3 bg-slate-100 hover:bg-slate-200/60 transition-all"
-            :class="!openSections.featuresCan ? 'border-none' : 'border-b border-slate-200/60'">
+            class="flex items-center justify-between cursor-pointer select-none px-4 py-3 bg-slate-100 hover:bg-slate-200/60 transition-all">
             <div class="flex items-center gap-2">
-              <PhCheckCircle :size="18" weight="fill" class="text-emerald-500 shrink-0" />
+              <PhCheckCircle :size="18" class="text-emerald-500 shrink-0" />
               <span class="text-[10px] font-black text-slate-700 uppercase tracking-wider">
                 Fitur yang BISA Dilakukan
               </span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[9px] font-bold text-slate-400">({{ capabilities.length }} Fitur)</span>
-              <PhCaretDown :size="15" weight="fill" class="text-accent transition-transform duration-300"
+              <PhCaretDown :size="15" class="text-accent transition-transform duration-300"
                 :class="{ '-rotate-180': !openSections.featuresCan }" />
             </div>
           </div>
+          <SketchDivider />
 
           <div v-show="openSections.featuresCan" class="p-3.5 space-y-2.5 divide-y divide-slate-100">
             <div v-for="(item, idx) in capabilities" :key="'can-' + idx"
               class="pt-2.5 first:pt-0 flex items-start gap-2.5">
               <div class="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                <PhCheckCircle :size="13" weight="bold" />
+                <PhCheckCircle :size="13" />
               </div>
               <div class="flex-1 min-w-0">
                 <h5 class="text-xs font-bold text-slate-800 leading-snug">{{ item.title }}</h5>
@@ -193,31 +200,31 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </div>
+        </SketchCard>
 
         <!-- SECTION 2: Fitur yang BELUM BISA / TIDAK Dilakukan (Collapsible) -->
-        <div class="shadow-md rounded-2xl overflow-hidden bg-white border border-slate-200/80">
+        <SketchCard class="shadow-md overflow-hidden bg-white">
           <div @click="toggleSection('featuresCannot')"
-            class="flex items-center justify-between cursor-pointer select-none px-4 py-3 bg-slate-100 hover:bg-slate-200/60 transition-all"
-            :class="!openSections.featuresCannot ? 'border-none' : 'border-b border-slate-200/60'">
+            class="flex items-center justify-between cursor-pointer select-none px-4 py-3 bg-slate-100 hover:bg-slate-200/60 transition-all">
             <div class="flex items-center gap-2">
-              <PhXCircle :size="18" weight="fill" class="text-rose-500 shrink-0" />
+              <PhXCircle :size="18" class="text-rose-500 shrink-0" />
               <span class="text-[10px] font-black text-slate-700 uppercase tracking-wider">
                 Batasan / Yang TIDAK Dilakukan
               </span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[9px] font-bold text-slate-400">({{ limitations.length }} Poin)</span>
-              <PhCaretDown :size="15" weight="fill" class="text-accent transition-transform duration-300"
+              <PhCaretDown :size="15" class="text-accent transition-transform duration-300"
                 :class="{ '-rotate-180': !openSections.featuresCannot }" />
             </div>
           </div>
+          <SketchDivider />
 
           <div v-show="openSections.featuresCannot" class="p-3.5 space-y-2.5 divide-y divide-slate-100">
             <div v-for="(item, idx) in limitations" :key="'cannot-' + idx"
               class="pt-2.5 first:pt-0 flex items-start gap-2.5">
               <div class="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
-                <PhXCircle :size="13" weight="bold" />
+                <PhXCircle :size="13" />
               </div>
               <div class="flex-1 min-w-0">
                 <h5 class="text-xs font-bold text-slate-800 leading-snug">{{ item.title }}</h5>
@@ -225,43 +232,44 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </div>
+        </SketchCard>
 
         <!-- SECTION 3: FAQ (Collapsible Parent + Sub-Accordions) -->
-        <div class="shadow-md rounded-2xl overflow-hidden bg-white border border-slate-200/80">
+        <SketchCard class="shadow-md overflow-hidden bg-white">
           <div @click="toggleSection('faq')"
-            class="flex items-center justify-between cursor-pointer select-none px-4 py-3 bg-slate-100 hover:bg-slate-200/60 transition-all"
-            :class="!openSections.faq ? 'border-none' : 'border-b border-slate-200/60'">
+            class="flex items-center justify-between cursor-pointer select-none px-4 py-3 bg-slate-100 hover:bg-slate-200/60 transition-all">
             <div class="flex items-center gap-2">
-              <PhQuestion :size="18" weight="fill" class="text-indigo-500 shrink-0" />
+              <PhQuestion :size="18" class="text-indigo-500 shrink-0" />
               <span class="text-[10px] font-black text-slate-700 uppercase tracking-wider">
                 Pertanyaan Sering Diajukan (FAQ)
               </span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[9px] font-bold text-slate-400">({{ faqs.length }} FAQ)</span>
-              <PhCaretDown :size="15" weight="fill" class="text-accent transition-transform duration-300"
+              <PhCaretDown :size="15" class="text-accent transition-transform duration-300"
                 :class="{ '-rotate-180': !openSections.faq }" />
             </div>
           </div>
+          <SketchDivider />
 
           <!-- FAQ Accordion List -->
           <div v-show="openSections.faq" class="p-2.5 space-y-2">
-            <div v-for="(faq, fIdx) in faqs" :key="'faq-' + fIdx"
-              class="border border-slate-200/70 rounded-xl overflow-hidden bg-slate-50/50">
+            <SketchCard v-for="(faq, fIdx) in faqs" :key="'faq-' + fIdx"
+              class="overflow-hidden bg-slate-50/50">
               <button @click="toggleFaq(fIdx)"
                 class="w-full text-left px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-slate-100/80 transition-colors cursor-pointer">
                 <span class="text-[11px] font-bold text-slate-800 leading-tight">{{ faq.q }}</span>
-                <PhCaretDown :size="13" weight="bold" class="text-slate-400 shrink-0 transition-transform duration-200"
+                <PhCaretDown :size="13" class="text-slate-400 shrink-0 transition-transform duration-200"
                   :class="{ '-rotate-180': openFaqItem === fIdx }" />
               </button>
+              <SketchDivider />
               <div v-show="openFaqItem === fIdx"
-                class="px-3 pb-3 pt-1 text-[10px] text-slate-600 leading-relaxed border-t border-slate-100 bg-white">
+                class="px-3 pb-3 pt-1 text-[10px] text-slate-600 leading-relaxed bg-white">
                 {{ faq.a }}
               </div>
-            </div>
+            </SketchCard>
           </div>
-        </div>
+        </SketchCard>
 
 
 

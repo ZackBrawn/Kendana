@@ -93,14 +93,21 @@ model TransactionType {
 }
 
 model Wallet {
-  id         Int      @id @default(autoincrement())
-  user_id    Int
-  name       String
-  balance    Decimal  @default(0)
-  group_type String   @default("Liquid")
-  icon       String   @default("💵")
-  keyword    String?
-  created_at DateTime @default(now())
+  id             Int       @id @default(autoincrement())
+  user_id        Int
+  name           String
+  balance        Decimal   @default(0)
+  group_type     String    @default("Liquid")
+  icon           String?
+  keyword        String?
+  is_active      Boolean   @default(true)
+  deleted_at     DateTime?
+  is_pinned      Boolean?
+  account_name   String?
+  account_number String?
+  bank_code      String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime?
 
   user        User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   source_logs TransactionLog[] @relation("SourceWallet")
@@ -111,14 +118,20 @@ model Wallet {
 }
 
 model Category {
-  id            Int      @id @default(autoincrement())
-  user_id       Int
-  type_id       Int
-  category_name String
-  icon          String   @default("📁")
-  keyword       String?
-  system_key    String?
-  created_at    DateTime @default(now())
+  id             Int       @id @default(autoincrement())
+  user_id        Int
+  type_id        Int
+  category_name  String
+  icon           String?
+  keyword        String?
+  system_key     String?
+  custom_name    String?
+  custom_icon    String?
+  custom_keyword String?   @db.Text
+  is_active      Boolean   @default(true)
+  deleted_at     DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime?
 
   user             User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   type             TransactionType  @relation(fields: [type_id], references: [id], onDelete: Cascade)
@@ -129,30 +142,36 @@ model Category {
 }
 
 model TransactionLog {
-  id                    Int      @id @default(autoincrement())
-  reference_number      String   @unique
+  id                    Int       @id @default(autoincrement())
+  reference_number      String    @unique
   user_id               Int
   date                  DateTime
   type_id               Int
   category_id           Int?
   source_wallet_id      Int
-  destination_wallet_id Int
+  destination_wallet_id Int?
   amount                Decimal
-  balance_before        Decimal  @default(0)
-  balance_after         Decimal  @default(0)
+  balance_before        Decimal   @default(0)
+  balance_after         Decimal   @default(0)
   subject               String?
   notes                 String?
-  is_cleared            Boolean  @default(true)
-  client_id             String?  @unique
-  created_at            DateTime @default(now())
+  is_cleared            Boolean   @default(true)
+  client_id             String?   @unique
+  deleted_at            DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime?
+  due_date              DateTime?
+  due_date_type         String?
+  due_date_interval     Int?
 
   user               User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
   type               TransactionType @relation(fields: [type_id], references: [id])
   category           Category?       @relation(fields: [category_id], references: [id], onDelete: SetNull)
   source_wallet      Wallet          @relation("SourceWallet", fields: [source_wallet_id], references: [id])
-  destination_wallet Wallet          @relation("DestWallet", fields: [destination_wallet_id], references: [id])
+  destination_wallet Wallet?         @relation("DestWallet", fields: [destination_wallet_id], references: [id], onDelete: Restrict)
   evidence           Evidence[]      @relation("EvidenceTransaction")
 
+  @@index([user_id, deleted_at, date])
   @@map("transaction_logs")
 }
 

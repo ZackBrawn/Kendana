@@ -16,6 +16,8 @@ exports.search = async (req, res) => {
     const wallets = await prisma.wallet.findMany({
       where: {
         user_id: userId,
+        is_active: true,
+        deleted_at: null,
         group_type: { not: 'System' },
         OR: [
           { name: { contains: term, mode: 'insensitive' } },
@@ -41,6 +43,8 @@ exports.search = async (req, res) => {
     const categories = await prisma.category.findMany({
       where: {
         user_id: userId,
+        is_active: true,
+        deleted_at: null,
         OR: [
           { category_name: { contains: term, mode: 'insensitive' } },
           { keyword: { contains: term, mode: 'insensitive' } }
@@ -65,6 +69,7 @@ exports.search = async (req, res) => {
     const transactions = await prisma.transactionLog.findMany({
       where: {
         user_id: userId,
+        deleted_at: null,
         OR: [
           { subject: { contains: term, mode: 'insensitive' } },
           { notes: { contains: term, mode: 'insensitive' } },
@@ -112,4 +117,3 @@ exports.search = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-

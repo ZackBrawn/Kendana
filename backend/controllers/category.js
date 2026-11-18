@@ -5,7 +5,7 @@ const { logChange } = require('../utils/settingsLogger');
 exports.getCategories = async (req, res) => {
   try {
     const categories = await prisma.category.findMany({
-      where: { user_id: req.user.id },
+      where: { user_id: req.user.id, is_active: true, deleted_at: null },
       include: { type: true },
       orderBy: { id: 'asc' }
     });
@@ -60,7 +60,7 @@ exports.updateCategory = async (req, res) => {
 
   try {
     const category = await prisma.category.findFirst({
-      where: { id: parseInt(id), user_id: req.user.id }
+      where: { id: parseInt(id), user_id: req.user.id, is_active: true, deleted_at: null }
     });
 
     if (!category) return res.status(404).json({ error: 'Kategori tidak ditemukan' });
@@ -108,7 +108,7 @@ exports.deleteCategory = async (req, res) => {
 
   try {
     const category = await prisma.category.findFirst({
-      where: { id: parseInt(id), user_id: req.user.id },
+      where: { id: parseInt(id), user_id: req.user.id, is_active: true, deleted_at: null },
       include: { type: true }
     });
 
@@ -146,7 +146,7 @@ exports.getCategoryDetail = async (req, res) => {
 
   try {
     const category = await prisma.category.findFirst({
-      where: { id: parseInt(id), user_id: req.user.id },
+      where: { id: parseInt(id), user_id: req.user.id, is_active: true, deleted_at: null },
       include: { type: true }
     });
 
@@ -174,6 +174,7 @@ exports.getCategoryDetail = async (req, res) => {
       where: {
         user_id: req.user.id,
         category_id: parseInt(id),
+        deleted_at: null,
         ...dateFilter
       },
       include: {

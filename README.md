@@ -21,18 +21,6 @@ Kendana adalah aplikasi personal finance management (PFM) yang membantu pengguna
 - Chat AI untuk pencatatan transaksi natural language
 - Push notification dan dashboard finansial
 
-## Struktur repo
-
-```text
-kendana/
-├── backend/        # API Express + Prisma
-├── frontend/       # Aplikasi Vue 3
-├── AGENTS.md       # Aturan kerja AI agent
-├── PRODUCT.md      # Product brief
-├── documentation.md # Dokumentasi project
-├── README.md       # Dokumentasi utama
-└── .vscode/        # Konfigurasi editor
-```
 
 ## Menjalankan project
 

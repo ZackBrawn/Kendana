@@ -29,7 +29,7 @@ exports.getTransactions = async (req, res) => {
   const { start_date, end_date, type, search } = req.query;
   const userId = req.user.id;
   
-  const whereClause = { user_id: userId };
+  const whereClause = { user_id: userId, deleted_at: null };
   
   // Date range filter
   if (start_date && end_date) {
@@ -95,7 +95,9 @@ exports.createTransaction = async (req, res) => {
   const userId = req.user.id;
 
   if (client_id) {
-    const existing = await prisma.transactionLog.findFirst({ where: { client_id, user_id: userId } });
+    const existing = await prisma.transactionLog.findFirst({
+      where: { client_id, user_id: userId, deleted_at: null }
+    });
     if (existing) return res.json({ success: true, transaction: existing, duplicate: true });
   }
 
@@ -113,10 +115,20 @@ exports.createTransaction = async (req, res) => {
 
     const transaction = await prisma.$transaction(async (tx) => {
       const sourceWallet = await tx.wallet.findFirst({
-        where: { id: parseInt(source_wallet_id), user_id: userId }
+        where: {
+          id: parseInt(source_wallet_id),
+          user_id: userId,
+          is_active: true,
+          deleted_at: null
+        }
       });
       const destWallet = await tx.wallet.findFirst({
-        where: { id: parseInt(destination_wallet_id), user_id: userId }
+        where: {
+          id: parseInt(destination_wallet_id),
+          user_id: userId,
+          is_active: true,
+          deleted_at: null
+        }
       });
 
       if (!sourceWallet || !destWallet) {
@@ -124,7 +136,12 @@ exports.createTransaction = async (req, res) => {
       }
 
       const category = category_id ? await tx.category.findFirst({
-        where: { id: parseInt(category_id), user_id: userId }
+        where: {
+          id: parseInt(category_id),
+          user_id: userId,
+          is_active: true,
+          deleted_at: null
+        }
       }) : null;
 
       const mainWallet = sourceWallet.group_type !== 'System' ? sourceWallet : destWallet;
@@ -203,11 +220,14 @@ exports.updateTransaction = async (req, res) => {
 
     const transaction = await prisma.$transaction(async (tx) => {
       const oldTx = await tx.transactionLog.findFirst({
-        where: { id: transactionId, user_id: userId }
+        where: { id: transactionId, user_id: userId, deleted_at: null }
       });
 
       if (!oldTx) {
         throw new Error('Transaksi tidak ditemukan');
+      }
+      if (oldTx.destination_wallet_id === null) {
+        throw new Error('Transaksi tanpa dompet tujuan tidak dapat diedit melalui alur ini');
       }
 
       const oldWasCleared = oldTx.is_cleared;
@@ -223,7 +243,12 @@ exports.updateTransaction = async (req, res) => {
       const walletIds = [...new Set([oldSrcId, oldDestId, newSrcId, newDestId])];
 
       const wallets = await tx.wallet.findMany({
-        where: { id: { in: walletIds }, user_id: userId }
+        where: {
+          id: { in: walletIds },
+          user_id: userId,
+          is_active: true,
+          deleted_at: null
+        }
       });
 
       if (wallets.length !== walletIds.length) {
@@ -247,7 +272,12 @@ exports.updateTransaction = async (req, res) => {
         where: { id: parseInt(oldTx.category_id), user_id: userId }
       }) : null;
       const newCategory = category_id ? await tx.category.findFirst({
-        where: { id: parseInt(category_id), user_id: userId }
+        where: {
+          id: parseInt(category_id),
+          user_id: userId,
+          is_active: true,
+          deleted_at: null
+        }
       }) : null;
 
       const oldSourceWallet = walletMap[oldSrcId];
@@ -336,7 +366,7 @@ exports.deleteTransaction = async (req, res) => {
   try {
     await prisma.$transaction(async (tx) => {
       const oldTx = await tx.transactionLog.findFirst({
-        where: { id: transactionId, user_id: userId }
+        where: { id: transactionId, user_id: userId, deleted_at: null }
       });
 
       if (!oldTx) {
@@ -344,6 +374,9 @@ exports.deleteTransaction = async (req, res) => {
       }
 
       if (oldTx.is_cleared) {
+        if (oldTx.destination_wallet_id === null) {
+          throw new Error('Transaksi tanpa dompet tujuan tidak dapat dihapus otomatis');
+        }
         const oldAmount = parseFloat(oldTx.amount);
         const oldSrcId = parseInt(oldTx.source_wallet_id);
         const oldDestId = parseInt(oldTx.destination_wallet_id);
@@ -395,7 +428,7 @@ exports.confirmTransaction = async (req, res) => {
   try {
     const transaction = await prisma.$transaction(async (tx) => {
       const log = await tx.transactionLog.findFirst({
-        where: { id: transactionId, user_id: userId }
+        where: { id: transactionId, user_id: userId, deleted_at: null }
       });
 
       if (!log) {
@@ -404,6 +437,9 @@ exports.confirmTransaction = async (req, res) => {
 
       if (log.is_cleared) {
         throw new Error('Transaksi ini sudah terkonfirmasi');
+      }
+      if (log.destination_wallet_id === null) {
+        throw new Error('Transaksi tanpa dompet tujuan tidak dapat dikonfirmasi melalui alur ini');
       }
 
       const numAmount = parseFloat(log.amount);

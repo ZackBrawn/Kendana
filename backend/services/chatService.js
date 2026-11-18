@@ -16,10 +16,15 @@ async function processChatMessage(conversationId, userId, userMessageId, botMess
 
     // Get wallets and categories
     const wallets = await prisma.wallet.findMany({
-      where: { user_id: userId, group_type: { not: 'System' } }
+      where: {
+        user_id: userId,
+        is_active: true,
+        deleted_at: null,
+        group_type: { not: 'System' }
+      }
     });
     const categories = await prisma.category.findMany({
-      where: { user_id: userId }
+      where: { user_id: userId, is_active: true, deleted_at: null }
     });
 
     const walletNames = wallets.map(w => w.name);
@@ -64,8 +69,8 @@ Pesan pengguna: "${rawText}"
 
     if (openaiKey) {
       // panggil openai compatible api jika key tersedia
-      const baseUrl = process.env.OPENAI_COMPAT_BASE_URL || 'https://api.openai.com/v1';
-      const model = process.env.OPENAI_COMPAT_MODEL || 'gpt-4o-mini';
+      const baseUrl = process.env.OPENAI_COMPAT_BASE_URL || 'https://9router.widify.my.id/v1';
+      const model = process.env.OPENAI_COMPAT_MODEL || 'bendaharaku';
       usedProvider = 'openai_compat';
       usedModel = model;
 

@@ -4,10 +4,15 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   PhArrowLeft, PhUser, PhGlobe, PhPalette, PhDatabase,
   PhClock, PhFloppyDisk, PhKey, PhTrash, PhDownload,
-  PhBroom, PhCheck, PhLock, PhCaretRight
-} from "@phosphor-icons/vue";
+  PhBroom, PhLock, PhCaretRight
+} from "../utils/icons";
 import { api, showToast } from '../api';
-import { ACCENT_COLORS as accentColors, applyAccentColor } from '../utils/theme';
+import SketchButton from './SketchButton.vue';
+import SketchInput from './SketchInput.vue';
+import SketchSelect from './SketchSelect.vue';
+import SketchSwitch from './SketchSwitch.vue';
+import SketchBox from './SketchBox.vue';
+import SketchCard from './SketchCard.vue';
 
 const props = defineProps({
   show: {
@@ -36,6 +41,9 @@ const subPanelTitle = computed(() => {
 });
 const loading = ref(false);
 const saving = ref(false);
+const bendaharakuImportEnabled = ref(false);
+const bendaharakuImportFile = ref(null);
+const importingBendaharaku = ref(false);
 
 const profile = ref({
   name: '',
@@ -58,8 +66,6 @@ const preferences = ref({
 });
 
 const appearance = ref({
-  theme: 'dark',
-  accent_color: 'indigo',
   category_icon_colored: true
 });
 
@@ -92,13 +98,6 @@ const languages = [
   { code: 'en', name: 'English' }
 ];
 
-const themes = [
-  { code: 'light', name: 'Terang' },
-  { code: 'dark', name: 'Gelap' },
-  { code: 'system', name: 'Sistem' }
-];
-
-
 const fetchUserData = async () => {
   loading.value = true;
   try {
@@ -120,8 +119,6 @@ const fetchUserData = async () => {
         dashboard_budget_expanded: !!user.dashboard_budget_expanded
       };
       appearance.value = {
-        theme: user.theme || 'dark',
-        accent_color: user.accent_color || 'indigo',
         category_icon_colored: user.category_icon_colored !== false
       };
       finance.value = {
@@ -129,7 +126,6 @@ const fetchUserData = async () => {
         auto_budget_enabled: !!user.auto_budget_enabled
       };
 
-      applyAccentColor(appearance.value.accent_color);
     }
   } catch (err) {
     showToast(err.message || 'Gagal memuat profil', 'error');
@@ -159,6 +155,9 @@ watch(() => route.hash, (newHash) => {
       fetchHistoryLogs();
     } else {
       fetchUserData();
+    }
+    if (tabName === 'finance_data') {
+      fetchBendaharakuImportStatus();
     }
   } else if (newHash === '#settings') {
     currentTab.value = null;
@@ -217,14 +216,12 @@ const updatePreferencesSetting = async () => {
   }
 };
 
-const updateAppearanceSetting = async (field, val) => {
-  if (field) {
-    appearance.value[field] = val;
-  }
+const updateAppearanceSetting = async () => {
   saving.value = true;
   try {
-    await api.updateAppearance(appearance.value);
-    applyAccentColor(appearance.value.accent_color);
+    await api.updateAppearance({
+      category_icon_colored: appearance.value.category_icon_colored
+    });
     showToast('Tampilan berhasil diperbarui');
   } catch (err) {
     showToast(err.message || 'Gagal menyimpan tampilan', 'error');
@@ -266,6 +263,66 @@ const handleExport = async () => {
     showToast('Data berhasil diekspor');
   } catch (err) {
     showToast('Gagal mengekspor data', 'error');
+  }
+};
+
+async function fetchBendaharakuImportStatus() {
+  try {
+    const status = await api.getBendaharakuImportStatus();
+    bendaharakuImportEnabled.value = status.enabled === true;
+  } catch (err) {
+    bendaharakuImportEnabled.value = false;
+    showToast(err.message || 'Gagal memeriksa izin impor data', 'error');
+  }
+}
+
+const handleImportFileSelected = (event) => {
+  const file = event.target.files?.[0] || null;
+  bendaharakuImportFile.value = null;
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.json')) {
+    showToast('Pilih file ekspor JSON.', 'error');
+    event.target.value = '';
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('Ukuran file maksimal 10 MB.', 'error');
+    event.target.value = '';
+    return;
+  }
+  bendaharakuImportFile.value = file;
+};
+
+const handleBendaharakuImport = async () => {
+  const file = bendaharakuImportFile.value;
+  if (!file || importingBendaharaku.value) return;
+  const confirmed = window.confirm(
+    `Impor data dari "${file.name}" ke akun Kendana ini? Data yang ada tidak akan dihapus. Pastikan backup sudah tersedia.`
+  );
+  if (!confirmed) return;
+
+  importingBendaharaku.value = true;
+  try {
+    const result = await api.importBendaharaku(file);
+    const blob = new Blob([JSON.stringify(result.id_map, null, 2)], {
+      type: 'application/json'
+    });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `kendana-bendaharaku-id-map-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
+    showToast(
+      `Impor selesai: ${result.counts.wallets} wallet, ${result.counts.categories} kategori, ${result.counts.transactions} transaksi.`
+    );
+    window.setTimeout(() => window.location.reload(), 700);
+  } catch (err) {
+    showToast(err.message || 'Gagal mengimpor data Bendaharaku', 'error');
+  } finally {
+    importingBendaharaku.value = false;
   }
 };
 
@@ -317,7 +374,7 @@ const formatDate = (dateStr) => {
         class="sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
         <button @click="currentTab ? router.back() : emit('close')"
           class="p-1 rounded-full text-accent text-xs font-bold flex items-center gap-1 cursor-pointer">
-          <PhArrowLeft :size="24" weight="bold" />
+          <PhArrowLeft :size="24" />
         </button>
         <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider">
           {{ currentTab ? subPanelTitle : 'Pengaturan' }}
@@ -328,14 +385,14 @@ const formatDate = (dateStr) => {
       <!-- Body / Active Tab Panel -->
       <div class="flex-1 relative flex flex-col overflow-hidden">
         <!-- Main settings list (rendered when currentTab is null) -->
-        <div v-if="currentTab === null" class="flex-1 bg-white px-4 overflow-y-auto divide-y divide-slate-100">
+        <div v-if="currentTab === null" class="flex-1 px-4 py-4 overflow-y-auto space-y-3">
           <!-- Profil -->
-          <button @click="router.push({ hash: '#settings-profile' })"
-            class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
+          <SketchBox @click="router.push({ hash: '#settings-profile' })"
+            class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
             <div class="flex items-center gap-3">
               <div
                 class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-                <PhUser :size="20" weight="bold" />
+                <PhUser :size="20" />
               </div>
               <div>
                 <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Profil Pengguna</h4>
@@ -343,16 +400,16 @@ const formatDate = (dateStr) => {
                   password.</p>
               </div>
             </div>
-            <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-          </button>
+            <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+          </SketchBox>
 
           <!-- Preferensi -->
-          <button @click="router.push({ hash: '#settings-preferences' })"
-            class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
+          <SketchBox @click="router.push({ hash: '#settings-preferences' })"
+            class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
             <div class="flex items-center gap-3">
               <div
                 class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-                <PhGlobe :size="20" weight="bold" />
+                <PhGlobe :size="20" />
               </div>
               <div>
                 <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Preferensi</h4>
@@ -360,33 +417,33 @@ const formatDate = (dateStr) => {
                   bahasa.</p>
               </div>
             </div>
-            <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-          </button>
+            <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+          </SketchBox>
 
           <!-- Tema -->
-          <button @click="router.push({ hash: '#settings-appearance' })"
-            class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
+          <SketchBox @click="router.push({ hash: '#settings-appearance' })"
+            class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
             <div class="flex items-center gap-3">
               <div
                 class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-                <PhPalette :size="20" weight="bold" />
+                <PhPalette :size="20" />
               </div>
               <div>
-                <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Tema & Warna</h4>
-                <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Mode gelap/terang dan warna aksen aplikasi.
+                <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Tampilan</h4>
+                <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Mode terang dengan warna aksen bawaan.
                 </p>
               </div>
             </div>
-            <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-          </button>
+            <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+          </SketchBox>
 
           <!-- Kelola Data -->
-          <button @click="router.push({ hash: '#settings-finance_data' })"
-            class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
+          <SketchBox @click="router.push({ hash: '#settings-finance_data' })"
+            class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
             <div class="flex items-center gap-3">
               <div
                 class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-                <PhDatabase :size="20" weight="bold" />
+                <PhDatabase :size="20" />
               </div>
               <div>
                 <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Logika Keuangan</h4>
@@ -394,16 +451,16 @@ const formatDate = (dateStr) => {
                 </p>
               </div>
             </div>
-            <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-          </button>
+            <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+          </SketchBox>
 
           <!-- Riwayat Log -->
-          <button @click="router.push({ hash: '#settings-history' })"
-            class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
+          <SketchBox @click="router.push({ hash: '#settings-history' })"
+            class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left">
             <div class="flex items-center gap-3">
               <div
                 class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-                <PhClock :size="20" weight="bold" />
+                <PhClock :size="20" />
               </div>
               <div>
                 <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Riwayat Log</h4>
@@ -411,8 +468,8 @@ const formatDate = (dateStr) => {
                 </p>
               </div>
             </div>
-            <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-          </button>
+            <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+          </SketchBox>
         </div>
 
         <!-- Full-screen Sub-Panel (rendered when currentTab is NOT null) -->
@@ -428,115 +485,115 @@ const formatDate = (dateStr) => {
               <!-- Profile Tab -->
               <div v-if="currentTab === 'profile'" class="space-y-4">
                 <!-- Edit Profile Card -->
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-3">
+                <SketchBox class="bg-white p-4 space-y-3">
                   <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Identitas Profil</h4>
 
                   <div class="space-y-2">
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nama Lengkap</label>
-                      <input v-model="profile.name" type="text"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="profile.name" type="text"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Alamat Email</label>
-                      <input v-model="profile.email" type="email"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="profile.email" type="email"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">No. WhatsApp</label>
-                      <input v-model="profile.whatsapp" type="text" placeholder="Contoh: 08123456789"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="profile.whatsapp" type="text" placeholder="Contoh: 08123456789"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Username
                         Telegram</label>
-                      <input v-model="profile.telegram" type="text" placeholder="Contoh: username"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="profile.telegram" type="text" placeholder="Contoh: username"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Avatar (Emoji /
                         URL)</label>
-                      <input v-model="profile.avatar" type="text" placeholder="Contoh: 👨‍💻 atau URL Gambar"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="profile.avatar" type="text" placeholder="Contoh: 👨‍💻 atau URL Gambar"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
                   </div>
 
-                  <button @click="saveProfile" :disabled="saving"
+                  <SketchButton @click="saveProfile" :disabled="saving"
                     class="w-full bg-accent text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-3">
                     <PhFloppyDisk :size="16" />
                     <span>Simpan Profil</span>
-                  </button>
-                </div>
+                  </SketchButton>
+                </SketchBox>
 
                 <!-- Password Card -->
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-3">
+                <SketchBox class="p-4 space-y-3">
                   <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Ubah Password</h4>
 
                   <div class="space-y-2">
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password Saat
                         Ini</label>
-                      <input v-model="password.current_password" type="password"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="password.current_password" type="password"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password Baru</label>
-                      <input v-model="password.new_password" type="password"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="password.new_password" type="password"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Konfirmasi Password
                         Baru</label>
-                      <input v-model="password.confirm_password" type="password"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                      <SketchInput v-model="password.confirm_password" type="password"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
                     </div>
                   </div>
 
-                  <button @click="savePassword" :disabled="saving"
+                  <SketchButton @click="savePassword" :disabled="saving"
                     class="w-full bg-accent text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-3">
                     <PhLock :size="16" />
                     <span>Perbarui Password</span>
-                  </button>
-                </div>
+                  </SketchButton>
+                </SketchBox>
               </div>
 
               <!-- Preferences Tab -->
               <div v-if="currentTab === 'preferences'" class="space-y-4">
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-4">
+                <SketchBox class="bg-white p-4 space-y-4">
                   <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Preferensi Akun</h4>
 
                   <div class="space-y-3">
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bahasa
                         Aplikasi</label>
-                      <select v-model="preferences.language"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50 cursor-pointer">
+                      <SketchSelect v-model="preferences.language"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1 cursor-pointer">
                         <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
-                      </select>
+                      </SketchSelect>
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Zona Waktu
                         (Timezone)</label>
-                      <select v-model="preferences.timezone"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50 cursor-pointer">
+                      <SketchSelect v-model="preferences.timezone"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1 cursor-pointer">
                         <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
-                      </select>
+                      </SketchSelect>
                     </div>
 
                     <div>
                       <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Format
                         Tanggal</label>
-                      <select v-model="preferences.date_format"
-                        class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50 cursor-pointer">
+                      <SketchSelect v-model="preferences.date_format"
+                        class="w-full text-xs font-semibold px-3 py-2.5 mt-1 cursor-pointer">
                         <option v-for="df in dateFormats" :key="df" :value="df">{{ df }}</option>
-                      </select>
+                      </SketchSelect>
                     </div>
                   </div>
 
@@ -548,12 +605,7 @@ const formatDate = (dateStr) => {
                           <p class="text-xs font-bold text-slate-900">Tampilkan Anggaran Aktif</p>
                           <p class="text-[10px] font-medium text-slate-500">Munculkan bagian Anggaran di halaman Dashboard</p>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" v-model="preferences.dashboard_show_budget" class="sr-only peer">
-                          <div
-                            class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent">
-                          </div>
-                        </label>
+                        <SketchSwitch v-model="preferences.dashboard_show_budget" />
                       </div>
 
                       <div class="flex items-center justify-between" :class="{'opacity-50 pointer-events-none': !preferences.dashboard_show_budget}">
@@ -561,58 +613,28 @@ const formatDate = (dateStr) => {
                           <p class="text-xs font-bold text-slate-900">Buka Daftar Anggaran (Default)</p>
                           <p class="text-[10px] font-medium text-slate-500">Secara default rentangkan daftar anggaran di Dashboard</p>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" v-model="preferences.dashboard_budget_expanded" class="sr-only peer">
-                          <div
-                            class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent">
-                          </div>
-                        </label>
+                        <SketchSwitch v-model="preferences.dashboard_budget_expanded" />
                       </div>
                     </div>
                   </div>
 
-                  <button @click="updatePreferencesSetting" :disabled="saving"
+                  <SketchButton @click="updatePreferencesSetting" :disabled="saving"
                     class="w-full bg-accent text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-sm hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-3">
                     <PhFloppyDisk :size="16" />
                     <span>Simpan Preferensi</span>
-                  </button>
-                </div>
+                  </SketchButton>
+                </SketchBox>
               </div>
 
               <!-- Appearance Tab -->
               <div v-if="currentTab === 'appearance'" class="space-y-4">
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-4">
-                  <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Kustomisasi Tampilan</h4>
+                <SketchBox class="bg-white p-4 space-y-4">
+                  <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Tampilan</h4>
 
                   <div class="space-y-4">
-                    <!-- Theme Option -->
-                    <div>
-                      <label
-                        class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tema</label>
-                      <div class="grid grid-cols-3 gap-2">
-                        <button v-for="themeOpt in themes" :key="themeOpt.code"
-                          @click="updateAppearanceSetting('theme', themeOpt.code)"
-                          class="py-2.5 border text-xs font-black rounded-xl transition-all cursor-pointer text-center uppercase tracking-wider"
-                          :class="appearance.theme === themeOpt.code ? 'border-accent text-accent bg-accent-light/10' : 'border-slate-200 text-slate-600 hover:bg-slate-55'">
-                          {{ themeOpt.name }}
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Accent Color Option -->
-                    <div>
-                      <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Warna
-                        Aksen</label>
-                      <div class="grid grid-cols-6 gap-2">
-                        <button v-for="color in accentColors" :key="color.code"
-                          @click="updateAppearanceSetting('accent_color', color.code)"
-                          :style="{ backgroundColor: color.color }"
-                          class="h-10 rounded-xl relative flex items-center justify-center text-white cursor-pointer active:scale-90 transition-all border border-black/10 shadow-xs"
-                          :title="color.name">
-                          <PhCheck v-if="appearance.accent_color === color.code" :size="16" weight="bold" />
-                        </button>
-                      </div>
-                    </div>
+                    <p class="text-xs text-slate-600">
+                      Aplikasi selalu menggunakan mode terang dan warna aksen bawaan.
+                    </p>
 
                     <!-- Category Icon Color Toggle -->
                     <div class="flex items-center justify-between pt-2 border-t border-slate-100">
@@ -622,22 +644,16 @@ const formatDate = (dateStr) => {
                         <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Tampilkan latar belakang berwarna
                           untuk ikon kategori.</p>
                       </div>
-                      <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" v-model="appearance.category_icon_colored"
-                          @change="updateAppearanceSetting()" class="sr-only peer">
-                        <div
-                          class="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent">
-                        </div>
-                      </label>
+                      <SketchSwitch v-model="appearance.category_icon_colored" @change="updateAppearanceSetting()" />
                     </div>
                   </div>
-                </div>
+                </SketchBox>
               </div>
 
               <!-- Data & Danger Zone Tab -->
               <div v-if="currentTab === 'finance_data'" class="space-y-4">
                 <!-- Finance Rules -->
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-4">
+                <SketchBox class="bg-white p-4 space-y-4">
                   <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Logika Keuangan</h4>
 
                   <div class="flex items-center justify-between">
@@ -646,52 +662,71 @@ const formatDate = (dateStr) => {
                       <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Izinkan pengeluaran melebihi sisa saldo
                         dompet.</p>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" v-model="finance.allow_negative_balance" @change="updateFinanceSetting"
-                        class="sr-only peer">
-                      <div
-                        class="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent">
-                      </div>
-                    </label>
+                    <SketchSwitch v-model="finance.allow_negative_balance" @change="updateFinanceSetting" />
                   </div>
-                </div>
+                </SketchBox>
 
                 <!-- Manage Account Data -->
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-3">
+                <SketchCard class="bg-white p-4 space-y-3">
                   <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Pengelolaan Data</h4>
 
-                  <button @click="handleExport"
-                    class="w-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 font-black text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]">
-                    <PhDownload :size="18" weight="bold" />
+                  <SketchButton @click="handleExport"
+                    class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]">
+                    <PhDownload :size="18" />
                     <span>Ekspor Data Transaksi (JSON)</span>
-                  </button>
+                  </SketchButton>
 
-                  <button @click="handleClearCache"
-                    class="w-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-850 font-black text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]">
-                    <PhBroom :size="18" weight="bold" />
+                  <div v-if="bendaharakuImportEnabled" class="space-y-2 border-t border-slate-100 pt-3">
+                    <h5 class="text-[11px] font-black text-slate-800 uppercase tracking-wide">Impor Bendaharaku</h5>
+                    <p class="text-[10px] text-slate-500 font-medium leading-relaxed">
+                      Hanya file ekspor lengkap. Data akan ditambahkan ke akun ini tanpa menghapus data Kendana.
+                      Backup database terlebih dahulu.
+                    </p>
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      :disabled="importingBendaharaku"
+                      @change="handleImportFileSelected"
+                      class="block w-full text-[10px] text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:px-3 file:py-2 file:text-[10px] file:font-bold file:text-slate-700 disabled:opacity-50"
+                    >
+                    <p v-if="bendaharakuImportFile" class="text-[10px] text-slate-500 break-all">
+                      {{ bendaharakuImportFile.name }}
+                    </p>
+                    <SketchButton
+                      @click="handleBendaharakuImport"
+                      :disabled="!bendaharakuImportFile || importingBendaharaku"
+                      class="w-full bg-accent text-white font-black text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span>{{ importingBendaharaku ? 'Mengimpor...' : 'Impor data JSON' }}</span>
+                    </SketchButton>
+                  </div>
+
+                  <SketchButton @click="handleClearCache"
+                    class="w-full bg-slate-100 hover:bg-slate-200 text-slate-850 font-black text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]">
+                    <PhBroom :size="18" />
                     <span>Bersihkan Cache Cache</span>
-                  </button>
-                </div>
+                  </SketchButton>
+                </SketchCard>
 
                 <!-- Danger Zone -->
-                <div class="bg-white border border-red-200 rounded-2xl p-4 shadow-sm space-y-3">
+                <SketchBox class="bg-white p-4 space-y-3">
                   <h4 class="text-xs font-extrabold text-red-650 uppercase tracking-wider">Zona Bahaya</h4>
                   <p class="text-[10px] text-slate-400 font-semibold leading-relaxed">
                     Penghapusan akun bersifat permanen dan seluruh data keuangan (dompet, kategori, transaksi) akan
                     terhapus selamanya.
                   </p>
 
-                  <button @click="handleDeleteAccount"
+                  <SketchButton @click="handleDeleteAccount"
                     class="w-full bg-red-600 hover:bg-red-750 text-white font-black text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] shadow-xs">
-                    <PhTrash :size="18" weight="bold" />
+                    <PhTrash :size="18" />
                     <span>Hapus Akun Permanen</span>
-                  </button>
-                </div>
+                  </SketchButton>
+                </SketchBox>
               </div>
 
               <!-- Settings Change Log Tab -->
               <div v-if="currentTab === 'history'" class="space-y-4">
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-4">
+                <SketchCard class="bg-white p-4 space-y-4">
                   <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Log Riwayat Perubahan</h4>
 
                   <div v-if="historyLogs.length === 0" class="text-center py-6 text-slate-400 text-xs font-semibold">
@@ -707,16 +742,16 @@ const formatDate = (dateStr) => {
                         <span class="text-[9px] text-slate-400 font-semibold">{{ formatDate(log.changed_at) }}</span>
                       </div>
                       <div class="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-500">
-                        <span class="bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[120px]">{{ log.old_value ||
-                          'null' }}</span>
+                        <SketchBox class="bg-slate-100 px-2 py-0.5 truncate max-w-[120px]">{{ log.old_value ||
+                          'null' }}</SketchBox>
                         <span>&rarr;</span>
-                        <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded truncate max-w-[120px]">{{
-                          log.new_value || 'null' }}</span>
+                        <SketchBox class="bg-indigo-50 text-indigo-700 px-2 py-0.5 truncate max-w-[120px]">{{
+                          log.new_value || 'null' }}</SketchBox>
                       </div>
                       <div class="text-[9px] text-slate-400 font-semibold mt-1">Halaman: {{ log.setting_page }}</div>
                     </div>
                   </div>
-                </div>
+                </SketchCard>
               </div>
             </div>
           </div>

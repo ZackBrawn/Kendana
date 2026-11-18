@@ -6,7 +6,7 @@ const { logChange } = require('../utils/settingsLogger');
 exports.getWallets = async (req, res) => {
   try {
     const wallets = await prisma.wallet.findMany({
-      where: { user_id: req.user.id },
+      where: { user_id: req.user.id, is_active: true, deleted_at: null },
       orderBy: { id: 'asc' }
     });
     res.json(wallets);
@@ -48,7 +48,7 @@ exports.updateWallet = async (req, res) => {
 
   try {
     const wallet = await prisma.wallet.findFirst({
-      where: { id: parseInt(id), user_id: req.user.id }
+      where: { id: parseInt(id), user_id: req.user.id, is_active: true, deleted_at: null }
     });
 
     if (!wallet) return res.status(404).json({ error: 'Dompet tidak ditemukan' });
@@ -88,7 +88,7 @@ exports.deleteWallet = async (req, res) => {
 
   try {
     const wallet = await prisma.wallet.findFirst({
-      where: { id: parseInt(id), user_id: req.user.id }
+      where: { id: parseInt(id), user_id: req.user.id, is_active: true, deleted_at: null }
     });
 
     if (!wallet) return res.status(404).json({ error: 'Dompet tidak ditemukan' });
@@ -130,7 +130,7 @@ exports.getWalletDetail = async (req, res) => {
 
   try {
     const wallet = await prisma.wallet.findFirst({
-      where: { id: parseInt(id), user_id: req.user.id }
+      where: { id: parseInt(id), user_id: req.user.id, is_active: true, deleted_at: null }
     });
 
     if (!wallet) return res.status(404).json({ error: 'Dompet tidak ditemukan' });
@@ -160,6 +160,7 @@ exports.getWalletDetail = async (req, res) => {
     const transactions = await prisma.transactionLog.findMany({
       where: {
         user_id: req.user.id,
+        deleted_at: null,
         OR: [
           { source_wallet_id: parseInt(id) },
           { destination_wallet_id: parseInt(id) }
@@ -183,6 +184,7 @@ exports.getWalletDetail = async (req, res) => {
     const totalCount = await prisma.transactionLog.count({
       where: {
         user_id: req.user.id,
+        deleted_at: null,
         OR: [
           { source_wallet_id: parseInt(id) },
           { destination_wallet_id: parseInt(id) }

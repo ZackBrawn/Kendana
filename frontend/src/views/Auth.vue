@@ -2,6 +2,9 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api, setAuthToken } from '../api';
+import SketchCard from '../components/SketchCard.vue';
+import SketchButton from '../components/SketchButton.vue';
+import SketchInput from '../components/SketchInput.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -41,10 +44,10 @@ const handleSubmit = async () => {
 
 <template>
   <div class="min-h-[80vh] flex flex-col justify-center">
-    <div class="bg-white border border-slate-200/80 rounded-xl p-6 shadow-xl space-y-5">
+    <SketchCard class="bg-white p-6 space-y-5">
       <div class="text-center space-y-1">
         <div
-          class="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center mx-auto shadow-md shadow-indigo-500/20">
+          class="w-12 h-12 rounded-2xl bg-accent text-white font-extrabold text-2xl flex items-center justify-center mx-auto">
           F
         </div>
         <h2 class="text-xl font-black text-slate-900 tracking-tight pt-2">Kendana</h2>
@@ -58,26 +61,26 @@ const handleSubmit = async () => {
       <form @submit.prevent="handleSubmit" class="space-y-3">
         <div v-if="!isLogin">
           <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Lengkap</label>
-          <input v-model="name" type="text" placeholder="Nama Anda" required
-            class="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-600" />
+          <SketchInput v-model="name" type="text" placeholder="Nama Anda" required
+            class="w-full text-xs px-3 py-2.5" />
         </div>
 
         <div>
           <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Email</label>
-          <input v-model="email" type="email" placeholder="nama@email.com" required
-            class="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-600" />
+          <SketchInput v-model="email" type="email" placeholder="nama@email.com" required
+            class="w-full text-xs px-3 py-2.5" />
         </div>
 
         <div>
           <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Password</label>
-          <input v-model="password" type="password" placeholder="••••••••" required
-            class="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-600" />
+          <SketchInput v-model="password" type="password" placeholder="••••••••" required
+            class="w-full text-xs px-3 py-2.5" />
         </div>
 
-        <button type="submit" :disabled="loading"
-          class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold rounded-2xl shadow-md transition-all text-xs uppercase tracking-wider">
+        <SketchButton type="submit" :disabled="loading"
+          class="w-full py-3 bg-accent hover:bg-accent-hover active:scale-98 text-white font-bold rounded-2xl transition-all text-xs uppercase tracking-wider">
           {{ loading ? 'Memproses...' : (isLogin ? 'Masuk' : 'Daftar') }}
-        </button>
+        </SketchButton>
       </form>
 
       <div class="relative flex py-1 items-center">
@@ -98,11 +101,11 @@ const handleSubmit = async () => {
       </a>
 
       <div class="text-center pt-2 border-t border-slate-100">
-        <button @click="isLogin = !isLogin" class="text-xs font-bold text-indigo-600 hover:underline">
+        <button @click="isLogin = !isLogin" class="text-xs font-bold text-accent hover:underline">
           {{ isLogin ? 'Belum punya akun? Daftar gratis' : 'Sudah punya akun? Masuk' }}
         </button>
       </div>
-    </div>
+    </SketchCard>
   </div>
 </template>
 

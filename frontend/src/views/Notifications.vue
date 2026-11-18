@@ -1,10 +1,15 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { PhArrowLeft, PhBell, PhEnvelope, PhGlobe, PhCaretRight, PhCalendarDots, PhPlus, PhPencil, PhTrash, PhPaperPlane, PhTimer, PhX } from '@phosphor-icons/vue';
+import { PhArrowLeft, PhBell, PhEnvelope, PhGlobe, PhCaretRight, PhCalendarDots, PhPlus, PhPencil, PhTrash, PhPaperPlane, PhTimer, PhX } from '../utils/icons';
 import { api, showToast } from '../api';
 import Calendar from '../components/Calendar.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
+import SketchButton from '../components/SketchButton.vue';
+import SketchInput from '../components/SketchInput.vue';
+import SketchSelect from '../components/SketchSelect.vue';
+import SketchSwitch from '../components/SketchSwitch.vue';
+import SketchBox from '../components/SketchBox.vue';
 
 const router = useRouter();
 const loading = ref(true);
@@ -565,7 +570,7 @@ onMounted(async () => {
         class="absolute left-0 p-1 rounded-full text-accent cursor-pointer"
         aria-label="Kembali ke halaman lainnya"
       >
-        <PhArrowLeft :size="24" weight="bold" />
+        <PhArrowLeft :size="24" />
       </button>
       <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
         {{ showPreferences ? 'Preferensi Notifikasi' : 'Notifikasi' }}
@@ -575,41 +580,39 @@ onMounted(async () => {
         @click="openAddNotification"
         class="absolute right-0 p-1 text-accent cursor-pointer"
       >
-        <PhPlus :size="24" weight="bold" />
+        <PhPlus :size="24" />
       </button>
     </div>
 
-    <div v-if="loading" class="bg-white border border-slate-200/60 rounded-2xl p-6 text-center text-xs text-slate-400 font-semibold">
+    <SketchBox v-if="loading" class="bg-white p-6 text-center text-xs text-slate-400 font-semibold">
       Memuat pengaturan notifikasi...
-    </div>
+    </SketchBox>
 
-    <div v-else class="divide-y divide-slate-100">
-      <div v-if="!showPreferences && !showCustomList" class="divide-y divide-slate-100">
-      <button
-        type="button"
+    <div v-else>
+      <div v-if="!showPreferences && !showCustomList" class="px-4 py-4 space-y-3">
+      <SketchBox tag="button" type="button"
         @click="openPreferences"
-        class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left"
+        class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left"
       >
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-            <PhBell :size="20" weight="bold" />
+            <PhBell :size="20" />
           </div>
           <div>
             <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide">Preferensi Notifikasi</h3>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Pilih peringatan yang ingin Anda terima.</p>
           </div>
         </div>
-        <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-      </button>
+        <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+      </SketchBox>
 
-      <button
-        type="button"
+      <SketchBox tag="button" type="button"
         @click="openCustomList"
-        class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left"
+        class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left"
       >
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-            <PhBell :size="20" weight="bold" />
+            <PhBell :size="20" />
           </div>
           <div>
             <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide">Notifikasi Kustom</h3>
@@ -618,69 +621,51 @@ onMounted(async () => {
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <span v-if="customNotifications.length" class="text-[10px] font-black text-accent bg-accent-light/10 px-2 py-0.5 rounded-full">{{ customNotifications.length }}</span>
-          <PhCaretRight :size="16" weight="bold" class="text-slate-400" />
+          <PhCaretRight :size="16" class="text-slate-400" />
         </div>
-      </button>
+      </SketchBox>
 
-      <button
+      <SketchBox tag="button"
         @click="sendTestPush"
         :disabled="testSending"
-        class="w-full bg-transparent py-4 px-1 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left disabled:opacity-50 disabled:cursor-wait"
+        class="w-full bg-white p-3.5 flex items-center justify-between hover:bg-slate-50/50 active:scale-[0.99] transition-all cursor-pointer text-left disabled:opacity-50 disabled:cursor-wait"
       >
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-accent-light/10 text-accent flex items-center justify-center shrink-0">
-            <PhBell :size="20" weight="bold" />
+            <PhBell :size="20" />
           </div>
           <div>
             <h3 class="text-xs font-black text-slate-800 uppercase tracking-wide">Kirim Notifikasi Test</h3>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Uji pengiriman push notification ke perangkat ini.</p>
           </div>
         </div>
-        <PhCaretRight :size="16" weight="bold" class="text-slate-400 shrink-0" />
-      </button>
+        <PhCaretRight :size="16" class="text-slate-400 shrink-0" />
+      </SketchBox>
       </div>
 
       <div v-else-if="showPreferences" class="py-4 px-4 space-y-4">
         <div class="space-y-4">
         <div class="flex items-center justify-between">
         <div class="flex items-center gap-3 min-w-0 pr-4">
-          <PhEnvelope :size="20" weight="bold" class="text-accent shrink-0" />
+          <PhEnvelope :size="20" class="text-accent shrink-0" />
           <div>
             <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Notifikasi Email</h4>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Kirim ringkasan laporan keuangan bulanan ke email.</p>
           </div>
         </div>
-        <label class="relative inline-flex items-center cursor-pointer shrink-0">
-          <input
-            v-model="notifications.email_notifications"
-            @change="updateNotifications"
-            :disabled="saving"
-            type="checkbox"
-            class="sr-only peer"
-          >
-          <div class="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
-        </label>
+        <SketchSwitch v-model="notifications.email_notifications" @change="updateNotifications" :disabled="saving" class="shrink-0" />
       </div>
 
       <div class="flex items-center justify-between pt-3 border-t border-slate-100">
         <div class="flex items-center gap-3 min-w-0 pr-4">
-          <PhGlobe :size="20" weight="bold" class="text-accent shrink-0" />
+          <PhGlobe :size="20" class="text-accent shrink-0" />
           <div>
             <h4 class="text-xs font-black text-slate-800 uppercase tracking-wide">Notifikasi Web Push</h4>
             <p class="text-[10px] text-slate-400 font-semibold mt-0.5">Dapatkan peringatan overbudget langsung di browser.</p>
             <p class="text-[10px] text-slate-400 font-semibold mt-1">{{ pushStatus }}</p>
           </div>
         </div>
-        <label class="relative inline-flex items-center cursor-pointer shrink-0">
-          <input
-            v-model="notifications.push_notifications"
-            @change="togglePush"
-            :disabled="saving"
-            type="checkbox"
-            class="sr-only peer"
-          >
-          <div class="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
-        </label>
+        <SketchSwitch v-model="notifications.push_notifications" @change="togglePush" :disabled="saving" class="shrink-0" />
       </div>
         </div>
       </div>
@@ -688,75 +673,75 @@ onMounted(async () => {
       <div v-else-if="showCustomList" class="py-4 px-4 space-y-4">
         <!-- Edit Form (overlay) -->
         <div v-if="showEditForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" @click.self="closeEditForm">
-          <div class="w-full max-w-md mx-4 bg-white rounded-2xl M- p-4 shadow-2xl animate-in fade-in duration-200" @click.stop>
+          <SketchBox class="w-full max-w-md mx-4 bg-white M- p-4 animate-in fade-in duration-200" @click.stop>
             <div class="flex items-center justify-between mb-4">
               <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider">
                 {{ editingNotification ? 'Edit Notifikasi' : 'Tambah Notifikasi' }}
               </h4>
               <button @click="closeEditForm" class="w-8 h-8 flex items-center justify-center text-slate-400 cursor-pointer">
-                <PhX :size="18" weight="bold" />
+                <PhX :size="18" />
               </button>
             </div>
 
             <div class="space-y-3">
               <div>
                 <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Judul</label>
-                <input v-model="editTitle" type="text" maxlength="80"
-                  class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50" />
+                <SketchInput v-model="editTitle" type="text" maxlength="80"
+                  class="w-full text-xs font-semibold px-3 py-2.5 mt-1" />
               </div>
 
               <div>
                 <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Isi Notifikasi</label>
-                <textarea v-model="editBody" maxlength="240" rows="3"
-                  class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50 resize-none"></textarea>
+                <SketchInput v-model="editBody" maxlength="240" :lines="3"
+                  class="w-full text-xs font-semibold px-3 py-2.5 mt-1 resize-none" />
               </div>
 
               <div>
                 <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tanggal Pengiriman</label>
-                <button type="button" @click="showEditDateCalendar = true"
-                  class="w-full h-[38px] bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 px-3 hover:bg-slate-100 transition-colors flex items-center gap-2 mt-1 cursor-pointer">
+                <SketchButton type="button" @click="showEditDateCalendar = true"
+                  class="w-full h-[38px] bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 px-3 hover:bg-slate-100 transition-colors flex items-center gap-2 mt-1 cursor-pointer">
                   <PhCalendarDots :size="16" class="text-accent shrink-0" />
                   <span>{{ formatDateForDisplay(editDate) }}</span>
-                </button>
+                </SketchButton>
               </div>
 
               <div>
                 <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Waktu Pengiriman</label>
-                <button type="button" @click="showEditTimeCalendar = true"
-                  class="w-full h-[38px] bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 px-3 hover:bg-slate-100 transition-colors flex items-center gap-2 mt-1 cursor-pointer">
+                <SketchButton type="button" @click="showEditTimeCalendar = true"
+                  class="w-full h-[38px] bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 px-3 hover:bg-slate-100 transition-colors flex items-center gap-2 mt-1 cursor-pointer">
                   <PhCalendarDots :size="16" class="text-accent shrink-0" />
                   <span>{{ formatTimeForDisplay(editTime) }}</span>
-                </button>
+                </SketchButton>
               </div>
 
               <div>
                 <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pengulangan</label>
-                <select v-model="editFrequency"
-                  class="w-full text-xs font-semibold px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-accent mt-1 bg-slate-50 cursor-pointer">
+                <SketchSelect v-model="editFrequency"
+                  class="w-full text-xs font-semibold mt-1 cursor-pointer">
                   <option value="once">Sekali pada waktu tertentu</option>
                   <option value="daily">Setiap hari</option>
                   <option value="weekly">Setiap minggu</option>
                   <option value="monthly">Setiap bulan</option>
-                </select>
+                </SketchSelect>
               </div>
             </div>
 
             <div class="flex gap-2 mt-4">
-              <button
+              <SketchButton
                 @click="closeEditForm"
                 class="flex-1 bg-slate-100 text-slate-700 font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-all hover:bg-slate-200"
               >
                 Batal
-              </button>
-              <button
+              </SketchButton>
+              <SketchButton
                 type="button"
                 @click="saveCustomNotification"
                 class="flex-1 bg-accent text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer transition-all hover:opacity-95"
               >
                 {{ editingNotification ? 'Simpan' : 'Tambah' }}
-              </button>
+              </SketchButton>
             </div>
-          </div>
+          </SketchBox>
         </div>
 
         <!-- Notification List with Swipe -->
@@ -781,20 +766,20 @@ onMounted(async () => {
                 @mousedown.stop
                 class="w-16 h-full flex items-center justify-center text-white bg-indigo-600 cursor-pointer transition-all hover:bg-indigo-700"
               >
-                <PhPencil :size="24" weight="bold" />
+                <PhPencil :size="24" />
               </button>
               <button
                 @click="initiateDelete(notification.id)"
                 @mousedown.stop
                 class="w-16 h-full flex items-center justify-center text-white bg-rose-500 cursor-pointer transition-all hover:bg-rose-600"
               >
-                <PhTrash :size="24" weight="bold" />
+                <PhTrash :size="24" />
               </button>
             </div>
 
             <!-- Swipeable Card -->
-            <div
-              class="relative bg-white border border-b-slate-200/60 rounded-xl p-3 shadow-sm transition-transform duration-200 cursor-pointer"
+            <SketchBox
+              class="relative bg-white p-3 transition-transform duration-200 cursor-pointer"
               :style="{ transform: `translateX(${getCustomSwipeTranslate(notification.id)}px)` }"
               @touchstart="handleCustomTouchStart($event, notification.id)"
               @touchmove="handleCustomTouchMove($event, notification.id)"
@@ -819,22 +804,22 @@ onMounted(async () => {
                   <span class="text-[10px] font-semibold text-slate-400">•</span>
                   <span class="text-[10px] font-semibold text-slate-455">{{ formatTimeForDisplay(notification.time) }}</span>
                 </div>
-                <button
+                <SketchButton
                   @click.stop="sendNotificationNow(notification)"
                   class="flex items-center gap-1 text-[10px] font-black text-accent bg-accent-light/10 px-2 py-1 rounded-lg cursor-pointer transition-all hover:bg-accent-light/20"
                 >
-                  <PhPaperPlane :size="12" weight="bold" />
+                  <PhPaperPlane :size="12" />
                   <span>Kirim Sekarang</span>
-                </button>
-                <button
+                </SketchButton>
+                <SketchButton
                   @click.stop="sendNotificationInTenSeconds(notification)"
                   class="flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg cursor-pointer transition-all hover:bg-amber-100"
                 >
-                  <PhTimer :size="12" weight="bold" />
+                  <PhTimer :size="12" />
                   <span>10 Detik</span>
-                </button>
+                </SketchButton>
               </div>
-            </div>
+            </SketchBox>
           </div>
         </div>
       </div>
