@@ -485,7 +485,7 @@ onUnmounted(() => {
             <div
               class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 text-accent">
               <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="24" />
-              <span v-else>{{ w.icon }}</span>
+              <span v-else aria-hidden="true"></span>
             </div>
             <div class="min-w-0">
               <h3 class="text-[11px] font-bold text-slate-900 truncate">{{ w.name }}</h3>
@@ -507,7 +507,7 @@ onUnmounted(() => {
             <div
               class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0 text-accent">
               <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="24" />
-              <span v-else>{{ w.icon }}</span>
+              <span v-else aria-hidden="true"></span>
             </div>
             <div class="min-w-0">
               <h3 class="text-[11px] font-bold text-slate-900 truncate">{{ w.name }}</h3>
@@ -605,7 +605,7 @@ onUnmounted(() => {
               </div>
               <div class="w-20 h-20 bg-white/30 rounded-xl flex items-center justify-center text-2xl text-white">
                 <component :is="resolveIcon(selectedWallet.icon)" v-if="resolveIcon(selectedWallet.icon)" :size="64" />
-                <span v-else>{{ selectedWallet.icon }}</span>
+                <span v-else aria-hidden="true"></span>
               </div>
             </div>
             <div class="relative z-10 mt-4">
@@ -644,7 +644,7 @@ onUnmounted(() => {
                       <span class="text-base flex items-center justify-center">
                         <component :is="resolveIcon(item.icon)" v-if="resolveIcon(item.icon)" :size="16"
                           class="text-slate-700" />
-                        <span v-else>{{ item.icon }}</span>
+                        <span v-else aria-hidden="true"></span>
                       </span>
                       <span class="text-xs font-bold text-slate-800">{{ item.name }}</span>
                     </div>
@@ -667,7 +667,7 @@ onUnmounted(() => {
                       <span class="text-base flex items-center justify-center">
                         <component :is="resolveIcon(item.icon)" v-if="resolveIcon(item.icon)" :size="16"
                           class="text-slate-700" />
-                        <span v-else>{{ item.icon }}</span>
+                        <span v-else aria-hidden="true"></span>
                       </span>
                       <span class="text-xs font-bold text-slate-800">{{ item.name }}</span>
                     </div>

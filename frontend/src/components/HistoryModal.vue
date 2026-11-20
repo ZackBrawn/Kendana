@@ -129,7 +129,7 @@ const formatGroupDateLabel = (dateStr) => {
               class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-2xs">
               <component :is="resolveIcon(historyItem.icon)" v-if="resolveIcon(historyItem.icon)"
                 :size="18" class="text-slate-700" />
-              <span v-else>{{ historyItem.icon }}</span>
+              <span v-else aria-hidden="true"></span>
             </span>
             <div>
               <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider truncate max-w-[180px]">{{ historyItem.name }}</h4>

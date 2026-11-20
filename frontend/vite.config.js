@@ -25,6 +25,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        importScripts: ['/sw-push.js'],
+        globIgnores: ['screenshot_*.png'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
@@ -41,6 +43,19 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('chart.js') || id.includes('@kurkle')) return 'charts';
+          if (id.includes('roughness')) return 'roughness';
+          if (id.includes('lucide')) return 'lucide';
+          if (id.includes('vue-router') || id.includes('/vue/') || id.includes('@vue/')) return 'vue';
+        }
+      }
+    }
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,

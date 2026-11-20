@@ -914,7 +914,7 @@ onUnmounted(() => {
             <span
               class="w-10 h-10 rounded-lg bg-slate-100 border border-slate-100 flex items-center justify-center shadow-3xs shrink-0">
               <component :is="resolveIcon(item.icon)" v-if="resolveIcon(item.icon)" :size="32" class="text-slate-700" />
-              <span v-else class="text-xs">{{ item.icon || '📁' }}</span>
+              <span v-else class="text-xs" aria-hidden="true"></span>
             </span>
             <span class="text-xs font-black text-slate-800 truncate flex-1 min-w-0">{{ item.name }}</span>
           </div>
@@ -950,7 +950,7 @@ onUnmounted(() => {
                 class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-2xs">
                 <component :is="resolveIcon(selectedItemHistory.icon)" v-if="resolveIcon(selectedItemHistory.icon)"
                   :size="18" class="text-slate-700" />
-                <span v-else>{{ selectedItemHistory.icon }}</span>
+                <span v-else aria-hidden="true"></span>
               </span>
               <div>
                 <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider truncate max-w-[180px]">{{

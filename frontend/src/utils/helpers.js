@@ -1,9 +1,16 @@
 import * as FinLogos from '../finlogos';
-import { PhosphorIconMap } from './icons';
+import { IconMap, PhosphorIconMap } from './icons';
 
 export const resolveIcon = (iconName) => {
-  if (iconName && FinLogos[iconName]) return FinLogos[iconName];
-  return iconName && PhosphorIconMap[iconName] ? PhosphorIconMap[iconName] : null;
+  if (!iconName || typeof iconName !== 'string') return null;
+  const name = iconName.trim();
+  if (FinLogos[name]) return FinLogos[name];
+  if (PhosphorIconMap[name]) return PhosphorIconMap[name];
+  if (IconMap[name]) return IconMap[name];
+  // Nama Lucide dari data lama/ekspor sering memakai kebab-case (mis. "shopping-cart").
+  const pascal = name.split(/[-_\s]+/).filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+  return IconMap[pascal] || null;
 };
 
 export const formatRp = (val) => {

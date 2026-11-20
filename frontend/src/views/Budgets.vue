@@ -497,7 +497,7 @@ onMounted(async () => {
           <div class="flex items-center gap-3 min-w-0">
             <div class="w-11 h-11 rounded-xl bg-accent-light text-accent flex items-center justify-center text-lg shrink-0">
               <component :is="resolveIcon(b.icon)" v-if="resolveIcon(b.icon)" :size="24" />
-              <span v-else>{{ b.icon }}</span>
+              <span v-else aria-hidden="true"></span>
             </div>
             <div class="min-w-0">
               <h4 class="text-xs font-bold text-slate-800 tracking-tight truncate">{{ b.name }}</h4>
@@ -573,7 +573,7 @@ onMounted(async () => {
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 rounded-xl bg-accent text-white flex items-center justify-center text-xl shrink-0">
                 <component :is="resolveIcon(selectedBudget.icon)" v-if="resolveIcon(selectedBudget.icon)" :size="26" />
-                <span v-else>{{ selectedBudget.icon }}</span>
+                <span v-else aria-hidden="true"></span>
               </div>
               <div class="min-w-0">
                 <h4 class="text-sm font-black text-slate-800 tracking-tight truncate">{{ selectedBudget.name }}</h4>
@@ -931,7 +931,7 @@ onMounted(async () => {
             <div class="flex items-center gap-3 min-w-0">
               <div class="w-11 h-11 rounded-xl bg-accent-light text-accent flex items-center justify-center text-lg shrink-0">
                 <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="24" />
-                <span v-else>{{ w.icon }}</span>
+                <span v-else aria-hidden="true"></span>
               </div>
               <div class="min-w-0 text-left">
                 <span class="block text-xs font-extrabold text-slate-800 truncate">{{ w.name }}</span>
@@ -974,7 +974,7 @@ onMounted(async () => {
               :class="selectedCategoryIds.includes(c.id) ? 'bg-accent/5 ring-1 ring-accent' : 'bg-white'">
               <span class="text-xl shrink-0 flex items-center justify-center text-slate-600">
                 <component :is="resolveIcon(c.icon)" v-if="resolveIcon(c.icon)" :size="22" />
-                <span v-else>{{ c.icon || '📁' }}</span>
+                <span v-else aria-hidden="true"></span>
               </span>
               <span class="text-[10px] truncate leading-tight w-full text-slate-800">{{ c.category_name }}</span>
               <div v-if="selectedCategoryIds.includes(c.id)" class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent text-white flex items-center justify-center">

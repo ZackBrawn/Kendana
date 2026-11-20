@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const path = require('path');
 const { prisma } = require('./config/db');
@@ -9,6 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(compression());
 app.use(express.json());
 
 // Register API Routes

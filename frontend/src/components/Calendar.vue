@@ -466,18 +466,18 @@ const nextCalendarMonth = () => {
 
         <div class="grid grid-cols-7 gap-1">
           <div v-for="n in calendarFirstDayOffset" :key="'offset-' + n" class="h-8"></div>
-          <button v-for="day in calendarDaysInMonth" :key="day" type="button" @click="selectCalendarDate(day)"
+          <SketchButton v-for="day in calendarDaysInMonth" :key="day" type="button" @click="selectCalendarDate(day)"
             :disabled="isDateDisabled(day)" :class="[
-              'h-8 w-full rounded-xl text-xs font-bold flex items-center justify-center transition-all shadow-2xs cursor-pointer',
+              'h-8 w-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer',
               isDateDisabled(day)
                 ? 'opacity-25 cursor-not-allowed bg-slate-100/50 text-slate-300'
                 : isDateSelected(day)
-                  ? 'bg-accent text-white font-black shadow-md scale-105'
-                  : 'bg-white text-slate-800 hover:bg-accent-light hover:text-accent border border-slate-200/60'
+                  ? 'bg-accent text-slate-900 font-black scale-105'
+                  : 'bg-white text-slate-800 hover:bg-accent-light'
             ]"
           >
             {{ day }}
-          </button>
+          </SketchButton>
         </div>
       </SketchBox>
     </SketchBox>

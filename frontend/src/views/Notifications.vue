@@ -17,9 +17,10 @@ const saving = ref(false);
 const showPreferences = ref(false);
 const testSending = ref(false);
 const pushStatus = ref('Memeriksa dukungan browser...');
+const pushServiceUnavailable = ref(false);
 const notifications = ref({
-  email_notifications: true,
-  push_notifications: true
+  email_notifications: false,
+  push_notifications: false
 });
 
 // Custom Notifications State
@@ -370,8 +371,8 @@ const fetchNotifications = async (showLoading = true) => {
     const user = res.user;
     if (user) {
       notifications.value = {
-        email_notifications: user.email_notifications !== false,
-        push_notifications: user.push_notifications !== false
+        email_notifications: user.email_notifications === true,
+        push_notifications: user.push_notifications === true
       };
     }
   } catch (err) {
@@ -441,6 +442,10 @@ const refreshPushStatus = async () => {
     pushStatus.value = 'Web Push tidak didukung browser ini';
     return;
   }
+  if (pushServiceUnavailable.value) {
+    pushStatus.value = 'Layanan push tidak tersedia — gunakan Chrome atau Firefox';
+    return;
+  }
 
   try {
     const registration = await getPushRegistration();
@@ -504,7 +509,11 @@ const enablePush = async () => {
   } catch (err) {
     console.error('[DEBUG] Enable push error:', err);
     notifications.value.push_notifications = previousValue;
-    showToast(err.message || 'Gagal mengaktifkan Web Push', 'error');
+    const message = err?.name === 'AbortError'
+      ? 'Layanan push tidak tersedia di browser ini. Gunakan Chrome atau Firefox.'
+      : (err.message || 'Gagal mengaktifkan Web Push');
+    if (err?.name === 'AbortError') pushServiceUnavailable.value = true;
+    showToast(message, 'error');
     await refreshPushStatus();
   }
 };
@@ -665,7 +674,7 @@ onMounted(async () => {
             <p class="text-[10px] text-slate-400 font-semibold mt-1">{{ pushStatus }}</p>
           </div>
         </div>
-        <SketchSwitch v-model="notifications.push_notifications" @change="togglePush" :disabled="saving" class="shrink-0" />
+        <SketchSwitch v-model="notifications.push_notifications" @change="togglePush" :disabled="saving || pushServiceUnavailable" class="shrink-0" />
       </div>
         </div>
       </div>

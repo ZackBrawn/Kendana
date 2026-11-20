@@ -352,7 +352,7 @@ onMounted(loadCategories);
                 <div class="flex items-center gap-2.5">
                   <span class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-2xs">
                     <component :is="resolveIcon(selectedCategory.icon)" v-if="resolveIcon(selectedCategory.icon)" :size="18" class="text-slate-700" />
-                    <span v-else>{{ selectedCategory.icon }}</span>
+                    <span v-else aria-hidden="true"></span>
                   </span>
                   <div>
                     <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider truncate max-w-[180px]">{{ selectedCategory.category_name }}</h4>

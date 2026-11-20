@@ -323,7 +323,7 @@ defineExpose({ redraw: draw });
     <canvas ref="canvas" class="absolute inset-0" @mousemove="onMove" @mouseleave="onLeave" @click="onClick"></canvas>
     <div
       v-if="tooltip.show"
-      class="absolute z-10 px-2 py-1 bg-slate-900/90 text-white text-[9px] font-bold rounded-lg pointer-events-none whitespace-nowrap"
+      class="absolute z-10 px-2 py-1 bg-[var(--surface)] text-[var(--text)] border border-[var(--line)] shadow-lg text-[9px] font-bold rounded-lg pointer-events-none whitespace-nowrap"
       :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px', transform: 'translate(-50%, -100%)' }"
     >
       {{ tooltip.label }}: {{ tooltip.value }}

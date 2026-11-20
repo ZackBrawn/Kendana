@@ -392,7 +392,7 @@ onUnmounted(() => {
           <div v-for="b in dashboardBudgets.slice(0, 3)" :key="b.id" class="space-y-1.5 py-1">
             <div class="flex items-center justify-between text-xs">
               <div class="flex items-center gap-2 min-w-0">
-                <span class="text-sm shrink-0" v-if="!resolveIcon(b.icon)">{{ b.icon }}</span>
+                <span class="text-sm shrink-0" v-if="!resolveIcon(b.icon)" aria-hidden="true"></span>
                 <component :is="resolveIcon(b.icon)" v-if="resolveIcon(b.icon)" :size="16" class="text-accent shrink-0" />
                 <span class="font-bold text-slate-700 truncate text-[11px]">{{ b.name }}</span>
               </div>

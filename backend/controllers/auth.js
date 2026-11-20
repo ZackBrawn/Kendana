@@ -3,10 +3,30 @@ const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/db');
 const { JWT_SECRET } = require('../middlewares/auth');
 
+// Pastikan tipe transaksi ada — tidak bergantung pada prisma seed/migrasi manual.
+// Ini ikut ter-build di image Docker, jadi server fresh langsung bisa buat kategori.
+async function ensureTransactionTypes() {
+  const types = [
+    { id: 1, name: 'Income' },
+    { id: 2, name: 'Expense' },
+    { id: 3, name: 'Transfer' },
+    { id: 4, name: 'Debt' },
+    { id: 5, name: 'Receivable' }
+  ];
+  for (const type of types) {
+    await prisma.transactionType.upsert({
+      where: { id: type.id },
+      update: { name: type.name },
+      create: type
+    });
+  }
+}
+
 /**
  * Seeds default wallets, categories, and notification for a newly registered user.
  */
 async function seedDefaultUserData(userId) {
+  await ensureTransactionTypes();
   // 1. System Wallets
   await prisma.wallet.createMany({
     data: [
@@ -90,7 +110,9 @@ exports.register = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        allow_negative_balance: false
+        allow_negative_balance: false,
+        email_notifications: false,
+        push_notifications: false
       },
       select: {
         id: true,
@@ -260,7 +282,9 @@ exports.handleGoogleCallback = async (req, res) => {
           google_id,
           avatar,
           password: hashedPassword,
-          allow_negative_balance: false
+          allow_negative_balance: false,
+          email_notifications: false,
+          push_notifications: false
         }
       });
 

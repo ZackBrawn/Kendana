@@ -715,7 +715,7 @@ onMounted(loadOptions);
                 ]">
                   <span class="text-xl shrink-0 flex items-center justify-center">
                     <component :is="resolveIcon(c.icon)" v-if="resolveIcon(c.icon)" :size="22" />
-                    <span v-else>{{ c.icon }}</span>
+                    <span v-else aria-hidden="true"></span>
                   </span>
                   <span class="text-[10px] truncate leading-tight w-full">{{ c.category_name }}</span>
                 </SketchBox>
@@ -740,7 +740,7 @@ onMounted(loadOptions);
                     <span class="text-base shrink-0 flex items-center justify-center">
                       <component :is="resolveIcon(c.icon)" v-if="resolveIcon(c.icon)" :size="18"
                         class="text-slate-700" />
-                      <span v-else>{{ c.icon }}</span>
+                      <span v-else aria-hidden="true"></span>
                     </span>
                     <span class="text-xs font-bold text-slate-800 truncate">{{ c.category_name }}</span>
                   </div>
@@ -871,7 +871,7 @@ onMounted(loadOptions);
               <div class="flex items-center gap-2.5">
                 <span class="shrink-0 flex items-center justify-center text-slate-500 w-4 h-4">
                   <component :is="resolveIcon(w.icon)" v-if="resolveIcon(w.icon)" :size="16" />
-                  <span v-else>{{ w.icon }}</span>
+                  <span v-else aria-hidden="true"></span>
                 </span>
                 <span class="text-xs font-bold text-slate-900">{{ w.name }}</span>
               </div>
